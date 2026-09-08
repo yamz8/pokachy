@@ -27,7 +27,7 @@
       <div id="auth" hidden>
         <button id="github" class="button secondary full" hidden>Continue with GitHub <span>↗</span></button>
         <div id="divider" class="divider" hidden>or use your email</div>
-        <form id="email-form"><label for="email">Email address <span>kept private</span></label><input id="email" type="email" autocomplete="email" placeholder="you@yourcorner.net" required maxlength="254"><div id="turnstile"></div><button class="button full" type="submit">Send me a code <span>→</span></button></form>
+        <form id="email-form"><label for="email">Email address <span>kept private</span></label><input id="email" type="email" autocomplete="email" placeholder="you@yourcorner.net" required maxlength="254"><div id="turnstile-container"></div><button class="button full" type="submit">Send me a code <span>→</span></button></form>
         <form id="code-form" hidden><label for="code">Your six-digit code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button class="button full" type="submit">Let me in <span>→</span></button><button id="change-email" type="button" class="text-button">Use a different email</button></form>
         <p class="fine">No password to remember. A code signs you in or creates your account.</p>
       </div>
