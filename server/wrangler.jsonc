@@ -1,0 +1,35 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "pokachy-local",
+  "account_id": "68e58be00ba1fb0b16cf0fe784bb317a",
+  "main": "src/index.ts",
+  // Use the current UTC date; the local timezone is already September 8.
+  "compatibility_date": "2026-09-07",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "assets": {"directory": "public", "binding": "ASSETS", "run_worker_first": true},
+  "vars": {
+    "ENVIRONMENT": "local", "BASE_URL": "http://127.0.0.1:8787",
+    "TURNSTILE_SITE_KEY": "", "TURNSTILE_HOSTNAMES": "127.0.0.1,localhost",
+    "MAIL_FROM": "Pokachy <hello@pokachy.com>", "ADMIN_USER_IDS": ""
+  },
+  "d1_databases": [{"binding": "DB", "database_name": "pokachy-local", "database_id": "00000000-0000-0000-0000-000000000001", "migrations_dir": "migrations"}],
+  "durable_objects": {"bindings": [{"name": "HUBS", "class_name": "UserHub"}]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["UserHub"]}],
+  "observability": {"enabled": true, "logs": {"enabled": true, "head_sampling_rate": 1}, "traces": {"enabled": true, "head_sampling_rate": 0.01}},
+  "limits": {"cpu_ms": 100},
+  "env": {
+    "production": {
+      "name": "pokachy",
+      "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>", "ADMIN_USER_IDS": ""},
+      "routes": [{"pattern": "pokachy.com", "custom_domain": true}],
+      "d1_databases": [{"binding": "DB", "database_name": "pokachy", "database_id": "0cd8e576-f169-42bb-b944-42b60ef5e44e", "migrations_dir": "migrations"}],
+      "durable_objects": {"bindings": [{"name": "HUBS", "class_name": "UserHub"}]},
+      "send_email": [{"name": "EMAIL"}],
+      "queues": {
+        "producers": [{"binding": "MAIL_QUEUE", "queue": "pokachy-mail"}],
+        "consumers": [{"queue": "pokachy-mail", "max_batch_size": 10, "max_retries": 3, "dead_letter_queue": "pokachy-mail-failed"}]
+      }
+    }
+  }
+}

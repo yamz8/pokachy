@@ -1,0 +1,26 @@
+{
+  "name": "@pokachy/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1",
+    "types": "wrangler types",
+    "check": "wrangler types && tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "wrangler d1 migrations apply pokachy-local --local",
+    "deploy:check": "wrangler deploy --env production --dry-run"
+  },
+  "dependencies": {
+    "better-auth": "^1.7.3",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.1.5",
+    "@types/node": "^26.5.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.129.1"
+  }
+}

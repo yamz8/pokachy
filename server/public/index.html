@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141715">
+  <meta name="description" content="A little nudge for your Linux friends. Pokachy lives in your terminal and Omarchy bar.">
+  <title>Pokachy — a little nudge</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/"><span class="brand-icon">p.</span>pokachy<span class="version">/ 0.1</span></a><span class="header-note">made for your linux desktop <span class="dot"></span></span></header>
+  <main>
+    <section class="intro">
+      <div class="eyebrow"><span class="dot"></span> A SMALL WAY TO SAY HEY</div>
+      <h1>Someone’s<br>thinking of <em>you.</em></h1>
+      <p class="lede">Send a little nudge. Get one back.<br>A familiar gesture, at home in your terminal.</p>
+      <div class="terminal" aria-label="Example Pokachy commands"><div class="terminal-top"><span>● ● ●</span><span>your little corner of linux</span></div><div class="terminal-body"><div><span class="prompt">~ $</span> pokachy poke @maya</div><div class="muted">↳ A little nudge, delivered.</div><div class="terminal-notice"><span class="hand">☞</span><div><strong>Maya poked you back</strong><small>It’s nice to be thought of.</small></div><span class="example-label">preview</span></div><div><span class="prompt">~ $</span> <span class="cursor">▌</span></div></div></div>
+      <div class="principles"><span>↳ linux first</span><span>↳ friends only</span><span>↳ no feed to scroll</span></div>
+      <p><a href="https://github.com/yamz8/pokachy/releases/latest">Download for Linux ↗</a> · <a href="https://github.com/yamz8/pokachy#readme">Installation &amp; source</a></p>
+    </section>
+    <section class="card" aria-labelledby="card-title">
+      <span class="card-kicker">YOUR PEOPLE, ONE POKE AWAY</span>
+      <h2 id="card-title">Make yourself at home.</h2>
+      <p id="card-description" class="muted">A handle. A few friends. That’s all you need.</p>
+      <div id="loading" class="muted">Connecting to Pokachy…</div>
+      <div id="auth" hidden>
+        <button id="github" class="button secondary full" hidden>Continue with GitHub <span>↗</span></button>
+        <div id="divider" class="divider" hidden>or use your email</div>
+        <form id="email-form"><label for="email">Email address <span>kept private</span></label><input id="email" type="email" autocomplete="email" placeholder="you@yourcorner.net" required maxlength="254"><div id="turnstile"></div><button class="button full" type="submit">Send me a code <span>→</span></button></form>
+        <form id="code-form" hidden><label for="code">Your six-digit code</label><input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000"><button class="button full" type="submit">Let me in <span>→</span></button><button id="change-email" type="button" class="text-button">Use a different email</button></form>
+        <p class="fine">No password to remember. A code signs you in or creates your account.</p>
+      </div>
+      <form id="profile-form" hidden><label for="handle">Choose your handle</label><div class="handle-input"><span>@</span><input id="handle" pattern="[a-z0-9][a-z0-9_]{2,23}" minlength="3" maxlength="24" required autocomplete="username" placeholder="yourname"></div><p class="fine">3–24 lowercase letters, numbers, or underscores.</p><button class="button full" type="submit">Save my handle <span>→</span></button></form>
+      <div id="approve" hidden><p>Your terminal is asking to connect this device.</p><div class="device-code" id="device-code"></div><p class="fine">Only approve if this matches the code in your own terminal.</p><button id="approve-button" class="button full">Connect my device <span>→</span></button><button id="deny-button" class="text-button">Deny this request</button></div>
+      <div id="connected" hidden><div class="connected-badge">✓ You’re connected</div><p id="identity"></p><p class="muted">Your friends are a terminal command away.</p><code class="command">pokachy friends add @friend</code><code class="command">pokachy poke @friend</code><button id="link-github" class="button secondary full" hidden>Link GitHub to this account</button><button id="sessions-toggle" class="text-button">Manage signed-in devices</button><div id="sessions" hidden></div></div>
+      <button id="signout" class="text-button" hidden>Sign out of this browser</button>
+      <p id="notice" role="status" aria-live="polite"></p>
+      <div id="local" class="local" hidden>LOCAL PREVIEW · emails stay on this computer <button id="local-code" class="text-button" hidden>Fill the development code</button></div>
+    </section>
+  </main>
+  <footer><span>Small gestures. Real people.</span><span>CLI + Omarchy plugin <span class="footer-star">✳</span></span></footer>
+</body>
+</html>

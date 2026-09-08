@@ -1,0 +1,18 @@
+CREATE TABLE user (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, emailVerified INTEGER NOT NULL DEFAULT 0, image TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL);
+CREATE TABLE session (id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE, expiresAt INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, ipAddress TEXT, userAgent TEXT, userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE);
+CREATE INDEX session_user ON session(userId);
+CREATE TABLE account (id TEXT PRIMARY KEY, accountId TEXT NOT NULL, providerId TEXT NOT NULL, userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, accessToken TEXT, refreshToken TEXT, idToken TEXT, accessTokenExpiresAt INTEGER, refreshTokenExpiresAt INTEGER, scope TEXT, password TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, UNIQUE(providerId,accountId));
+CREATE TABLE verification (id TEXT PRIMARY KEY, identifier TEXT NOT NULL, value TEXT NOT NULL, expiresAt INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL);
+CREATE INDEX verification_identifier ON verification(identifier);
+CREATE TABLE deviceCode (id TEXT PRIMARY KEY, deviceCode TEXT NOT NULL UNIQUE, userCode TEXT NOT NULL UNIQUE, userId TEXT, expiresAt INTEGER NOT NULL, status TEXT NOT NULL, lastPolledAt INTEGER, pollingInterval INTEGER, clientId TEXT, scope TEXT);
+CREATE TABLE rateLimit (id TEXT PRIMARY KEY, key TEXT NOT NULL UNIQUE, count INTEGER NOT NULL, lastRequest INTEGER NOT NULL);
+CREATE TABLE profiles (user_id TEXT PRIMARY KEY REFERENCES user(id) ON DELETE CASCADE, handle TEXT NOT NULL UNIQUE, quiet INTEGER NOT NULL DEFAULT 0, suspended INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE friendships (a TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, b TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, requester TEXT NOT NULL REFERENCES user(id), accepted INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, PRIMARY KEY(a,b), CHECK(a < b));
+CREATE INDEX friendships_b ON friendships(b);
+CREATE TABLE blocks (blocker TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, blocked TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, PRIMARY KEY(blocker,blocked));
+CREATE TABLE pokes (id TEXT PRIMARY KEY, sender TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, recipient TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, created_at INTEGER NOT NULL, resolved_at INTEGER, request_key TEXT NOT NULL, UNIQUE(sender,request_key));
+CREATE UNIQUE INDEX poke_pending ON pokes(sender,recipient) WHERE resolved_at IS NULL;
+CREATE INDEX poke_inbox ON pokes(recipient,created_at DESC);
+CREATE INDEX poke_sent ON pokes(sender,created_at DESC);
+CREATE TABLE reports (id TEXT PRIMARY KEY, reporter TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, reported TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE, reason TEXT NOT NULL, created_at INTEGER NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE dev_mail (email TEXT PRIMARY KEY, otp TEXT NOT NULL, expires_at INTEGER NOT NULL);

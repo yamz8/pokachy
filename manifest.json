@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "com.pokachy.poke",
+  "name": "Pokachy",
+  "version": "0.1.0",
+  "author": "Pokachy",
+  "description": "A little nudge for your Linux friends. Requires the pokachy CLI.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "plugins/omarchy/BarWidget.qml"},
+  "barWidget": {
+    "displayName": "Pokachy",
+    "category": "Social",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
