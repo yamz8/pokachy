@@ -2,7 +2,9 @@
   "name": "pokachy",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["server"],
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
     "dev": "npm run dev --workspace server",
     "types": "npm run types --workspace server",
@@ -10,6 +12,8 @@
     "test": "npm run test --workspace server",
     "db:migrate": "npm run db:migrate --workspace server",
     "build:cli": "cd cli && go build -o bin/pokachy ./cmd/pokachy",
-    "test:cli": "cd cli && go test ./..."
+    "test:cli": "cd cli && go test ./...",
+    "verify": "python3 scripts/verify.py",
+    "verify:e2e": "python3 scripts/verify-e2e.py"
   }
 }

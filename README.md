@@ -68,10 +68,10 @@ POKACHY_CONFIG_DIR=/tmp/pokachy-dev cli/bin/pokachy daemon
 Use a different `POKACHY_CONFIG_DIR` for each development account. Production credentials under `.secrets/` are not automatically loaded by the local server.
 
 ```sh
-npm run check
-npm test
-npm run test:cli
+npm run verify
 ```
+
+See [verification](docs/verification.md) for the isolated end-to-end checks, machine-readable report, and remaining live checks.
 
 The Workers-runtime tests cover authentication, friendship consent, concurrent/idempotent pokes, blocking, session isolation/revocation, live events, Turnstile rejection, and queue retries. Go tests cover trusted origins, redirects, API errors, and private storage.
 
