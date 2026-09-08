@@ -61,7 +61,15 @@ app.use("*", async (c, next) => {
 });
 
 app.get("/api/config", c => c.json({ local: isLocal(c.env), github: !!(c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET), turnstileSiteKey: c.env.TURNSTILE_SITE_KEY, version: "0.1.0" }));
-app.get("/health", c => c.json({ status: "ok", version: "0.1.0" }));
+app.get("/health", async c => {
+  c.header("Cache-Control", "no-store");
+  try {
+    await c.env.DB.prepare("SELECT 1").first();
+    return c.json({ status: "ok", version: "0.1.0", revision: c.env.DEPLOY_REVISION ?? "unversioned" });
+  } catch {
+    return c.json({ status: "unavailable" }, 503);
+  }
+});
 
 app.on(["GET", "POST"], "/api/auth/*", async c => {
   const ip = c.req.header("CF-Connecting-IP") ?? "local";

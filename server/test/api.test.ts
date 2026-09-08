@@ -135,3 +135,17 @@ test("public config fails closed without production secrets",async()=>{
   const res=await worker.fetch(new Request("https://pokachy.com/api/dev/mail?email=a@example.test"),production,ctx);
   expect(res.status).toBe(503);
 });
+
+
+test("health reports deployment identity and fails closed on database outage", async () => {
+  const response = await worker.fetch(new Request(origin + "/health"), { ...env, DEPLOY_REVISION: "test-revision" }, ctx);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(await response.json()).toEqual({ status: "ok", version: "0.1.0", revision: "test-revision" });
+  const prepare = vi.spyOn(env.DB, "prepare").mockImplementation(() => { throw new Error("private database detail"); });
+  try {
+    const failed = await request("/health");
+    expect(failed.status).toBe(503);
+    expect(await failed.json()).toEqual({ status: "unavailable" });
+  } finally { prepare.mockRestore(); }
+});

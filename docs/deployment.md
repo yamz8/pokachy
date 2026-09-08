@@ -14,26 +14,56 @@ Production requires D1 database `pokachy`, Durable Object `UserHub`, queues `pok
 
 For another account, create these resources with the project's Wrangler, replace account/database IDs in the configuration, and onboard the sending domain. Verify DNS before testing with a real inbox you control.
 
+## GitHub deployment credential (one-time setup)
+
+The GitHub `production` environment permits only branch `main`. Store a dedicated Cloudflare API token there as `CLOUDFLARE_API_TOKEN`. The account ID is already public configuration; application secrets stay in the Worker and are not copied to GitHub.
+
+Use Cloudflare's **Edit Cloudflare Workers** token template, scope it to the Pokachy account and `pokachy.com`, and include account **D1 Edit** and **Queues Edit** for migrations and queue configuration. Review the template's permissions and remove access to unrelated resources. See [Cloudflare's GitHub Actions setup](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/) and [permission reference](https://developers.cloudflare.com/fundamentals/api/reference/permissions/). A token created for another integration may not have these permissions; the first deployment must verify them.
+
+Enter the token through the hidden terminal prompt:
+
+```sh
+gh secret set CLOUDFLARE_API_TOKEN --repo yamz8/pokachy --env production
+```
+
+Do not paste it into chat, commit it, or use a laptop's Wrangler OAuth token as a permanent CI credential.
+
 ## Deploy
 
-From the repository root:
+Push the reviewed change to `main`. Inspect pending migration SQL in `server/migrations/` against production's migration list:
 
 ```sh
-npm ci
-npm run check
-npm test
-npm run test:cli
-npm run deploy:check --workspace server
+cd server
+npx --no-install wrangler d1 migrations list pokachy --env production --remote
 ```
 
-From `server/`:
+From the repository root, dispatch **Deploy production** in GitHub Actions, selecting `main` and confirming migration review, or run:
 
 ```sh
-npx wrangler d1 migrations apply pokachy --env production --remote
-npx wrangler deploy --env production --secrets-file ../.secrets/production.json
+gh workflow run deploy.yml --repo yamz8/pokachy --ref main -f migrations_reviewed=true
 ```
 
-Secrets are uploaded alongside code. Later deployments preserve existing secrets unless explicitly changed. A dry run validates packaging, not DNS, email delivery, or OAuth callbacks.
+Only confirm after reviewing pending migrations, including when there are none. Migrations must be additive and remain compatible with the currently deployed code. Destructive changes require a separate staged migration and recovery plan. Do not run manual deployments concurrently with this workflow.
+
+The workflow pins the checkout to the dispatch commit, runs `npm run verify` and a production dry run without deployment credentials, then uses the production environment token for remote operations. It uploads the prior deployment metadata, a D1 Time Travel bookmark, and pending migration list **before** applying migrations. It deploys the tested commit with `DEPLOY_REVISION`, preserves existing Worker secrets, and verifies the live revision and public endpoints. Deployments are serialized and never canceled halfway through migrations. Pushes and release tags do not deploy production.
+
+Download the verification and recovery artifacts from the run. A failed post-deploy check means production may have changed; inspect before retrying. Dry-run success validates packaging, not live permissions or integrations.
+
+## Code rollback and database recovery
+
+1. Stop dispatching deployments and inspect the failed run plus its `recovery-*` artifact.
+2. Identify the previously active version ID in `deployments-before.json`; confirm it was a single-version deployment and remains compatible with the current database schema and bindings.
+3. From `server/`, roll back to that explicitly selected version:
+
+```sh
+npx --no-install wrangler rollback PREVIOUS_VERSION_ID --env production --message "Recovery from failed deployment"
+```
+
+4. From the repository root, run `npm run verify:live -- --expected-revision PREVIOUS_GIT_SHA`. For a deployment predating revision metadata, omit that option and separately verify its Cloudflare version ID.
+
+Code rollback does not reverse D1 changes. Cloudflare also restricts rollback across Durable Object lifecycle changes and incompatible resource changes; inspect [rollback limitations](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/) before executing it.
+
+`d1-before.json` records a recovery bookmark, **not an exported backup**. On Workers Paid, D1 Time Travel retains recovery history for 30 days. A database restore can discard newer user writes, so it is never automated here: stop writes, assess data loss, and obtain explicit owner authorization before a restore. Follow [D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) using the recorded bookmark. Recovery artifacts are retained for 30 days; their existence does not prove a restore has been rehearsed.
 
 ## Administrator
 

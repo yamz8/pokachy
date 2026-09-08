@@ -1,0 +1,111 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      migrations_reviewed:
+        description: 'I reviewed pending D1 migrations: they are additive and compatible with the currently deployed Worker.'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Do not cancel a deployment while it is applying migrations.
+concurrency:
+  group: pokachy-production
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && inputs.migrations_reviewed
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run deploy:check --workspace server
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-${{ github.sha }}
+          path: artifacts/verification.json
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy:
+    needs: verify
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: Capture recovery metadata before migrations
+        working-directory: server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Set the production environment CLOUDFLARE_API_TOKEN secret.' >&2; exit 1; }
+          npx --no-install wrangler secret list --env production --format json > "$RUNNER_TEMP/pokachy-secret-names.json"
+          python3 -c 'import json,sys; names={s["name"] for s in json.load(open(sys.argv[1]))}; required={"BETTER_AUTH_SECRET","GITHUB_CLIENT_ID","GITHUB_CLIENT_SECRET","TURNSTILE_SECRET"}; missing=required-names; sys.exit("Missing Worker secrets: " + ", ".join(sorted(missing)) if missing else 0)' "$RUNNER_TEMP/pokachy-secret-names.json"
+          mkdir -p ../artifacts/recovery
+          npx --no-install wrangler deployments list --env production --json > ../artifacts/recovery/deployments-before.json
+          npx --no-install wrangler d1 time-travel info pokachy --env production --json > ../artifacts/recovery/d1-before.json
+          npx --no-install wrangler d1 migrations list pokachy --env production --remote > ../artifacts/recovery/migrations-before.txt
+          printf '%s\n' "$GITHUB_SHA" > ../artifacts/recovery/target-revision.txt
+      - name: Preserve recovery metadata before changing production
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/recovery/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Apply reviewed migrations and deploy verified commit
+        working-directory: server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx --no-install wrangler d1 migrations apply pokachy --env production --remote
+          npx --no-install wrangler deploy --env production --var "DEPLOY_REVISION:$GITHUB_SHA" --tag "$GITHUB_SHA" --message "GitHub Actions $GITHUB_RUN_ID"
+      - name: Verify live revision and public endpoints
+        run: npm run verify:live -- --expected-revision "$GITHUB_SHA"
+      - name: Save live verification report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-verification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/live-verification.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Recovery guidance
+        if: failure()
+        run: echo 'Production may have changed. Inspect recovery artifacts and docs/deployment.md. Database changes are never automatically reversed.' >> "$GITHUB_STEP_SUMMARY"

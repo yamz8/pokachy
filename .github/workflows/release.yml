@@ -25,13 +25,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci
-      - run: npm run check
-      - run: npm test
-      - working-directory: cli
-        run: go test ./...
-      - working-directory: cli
-        run: go vet ./...
-      - run: npm run verify:e2e
+      - run: npm run verify
       - run: scripts/package-release.sh "${GITHUB_REF_NAME}"
       - env:
           GH_TOKEN: ${{ github.token }}

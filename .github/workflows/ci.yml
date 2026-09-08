@@ -53,3 +53,18 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       - run: npm run verify:e2e
+
+  installer-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 scripts/test-verify-live.py
+      - run: python3 scripts/verify-install.py

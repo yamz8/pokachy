@@ -25,6 +25,8 @@ def main():
         ('Worker integration tests', ['npm', 'test'], ROOT, 180),
         ('Go tests', ['go', 'test', './...'], ROOT / 'cli', 180),
         ('Go static analysis', ['go', 'vet', './...'], ROOT / 'cli', 180),
+        ('Deployment smoke checker tests', [sys.executable, 'scripts/test-verify-live.py'], ROOT, 60),
+        ('Release installer', [sys.executable, 'scripts/verify-install.py'], ROOT, 360),
         ('Native CLI end-to-end', [sys.executable, 'scripts/verify-e2e.py'], ROOT, 360),
     ]
     report = {'startedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
