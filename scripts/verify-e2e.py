@@ -295,7 +295,9 @@ def main() -> None:
             init.wait(15)
         except subprocess.TimeoutExpired:
             fail("CLI device completion")
-        check(init.returncode == 0 and any("Connected as @clialice" in line for line in captured), "CLI device approval")
+        check(init.returncode == 0, "CLI device approval exit " + str(init.returncode))
+        initialized = read_json(cli_dir / "state.json")
+        check(isinstance(initialized, dict) and initialized.get("me", {}).get("handle") == "clialice", "CLI authenticated account")
         check((cli_dir / "credentials.json").is_file(), "CLI credentials")
 
         run_fails([str(binary), "poke", "@bobby"], "CLI poke requires friendship", cwd=ROOT, env=cli_env,
