@@ -10,23 +10,26 @@ This session covers CI/CD and verification only. Stop before desktop installatio
 - Release tags run the full verification suite before publishing assets.
 - `deploy.yml` provides manual, serialized production deployment from a tested immutable `main` commit, with migration-review attestation, required-secret preflight, recovery artifacts before migrations, and a live revision check afterward.
 - GitHub's `production` environment is configured to allow only branch `main`.
-- `/health` now reads D1 and reports deployment revision; database errors return a generic 503. This change becomes live only after the next deployment.
+- `/health` now reads D1 and reports deployment revision; database errors return a generic 503. This is live in production at revision `d89ed1af2d6b95e5cf2c6782bbe8f630b2f0c40a`.
 - `npm run verify:live` checks production read-only and writes a fresh report.
 - Deployment credential setup, migration review, code rollback, and separate D1 recovery are documented in `docs/deployment.md`.
 
 ## Verification in this session
 
-- `npm run verify`: passed all seven stages; eight Worker tests, six smoke-checker tests, installer checks, and native CLI integration. Fresh local report: `artifacts/verification.json`, started `2026-09-08T22:06:44Z` (September 9 in Israel).
+- `npm run verify`: passed all seven stages; eight Worker tests, six smoke-checker tests, installer checks, and native CLI integration. Fresh local report: `artifacts/verification.json`, started `2026-09-09T03:32:29Z`.
 - Production Wrangler dry run: passed.
 - actionlint 1.7.7: passed on the final workflows, including the required-secret preflight.
-- Live read-only smoke: all seven checks passed on the existing deployment. This is not proof of deployment through GitHub or of the new revision metadata.
+- Live read-only smoke: all seven checks passed after deployment and `/health` returned the exact expected Git revision.
 - Luna reviewed workflow credential scope, commit identity, migration/recovery ordering, and smoke failure behavior; no material findings. Pinning third-party action references to immutable SHAs remains optional hardening.
+- Two earlier deployment runs stopped safely during verification before touching production. Their device-flow failures matched a five-second idle-connection race documented in Wrangler 4.129.1's development proxy. The disposable test fixture now keeps that proxy active with read-only health requests while waiting for device approval; it does not retry one-time token redemption or change production behavior.
 
-## Immediate remaining CI/CD step
+## Production deployment completed
 
-GitHub has no Cloudflare deployment API token yet. The connected Cloudflare API cannot create one (authorization scope failure). Have the owner create a dedicated scoped token and enter it using the hidden `gh secret set` prompt in `docs/deployment.md`. Do not copy laptop OAuth credentials into CI or expose tokens in chat.
+The owner created a dedicated Cloudflare token and stored it as the GitHub `production` environment secret `CLOUDFLARE_API_TOKEN`. Keep it private and rotate it through the hidden `gh secret set` prompt documented in `docs/deployment.md`; do not copy laptop OAuth credentials into CI or expose tokens in chat.
 
-Once set, dispatch `deploy.yml` on main after reviewing pending migrations. Observe the entire run, inspect verification/recovery artifacts, and confirm `/health` matches the dispatched SHA. Resolve any token-permission failures before claiming CD works end to end. The first real GitHub deployment and a recovery rehearsal have not been completed.
+GitHub Actions run `34307601788` completed the first end-to-end production deployment successfully. It verified all seven local stages, passed the production dry run, confirmed required Worker secrets, saved pre-deployment Worker and D1 recovery metadata, found no pending migration, deployed the tested commit, and passed its revision-aware live smoke check. The retained run artifacts are `verification-d89ed1af2d6b95e5cf2c6782bbe8f630b2f0c40a`, `recovery-34307601788-1`, and `live-verification-34307601788-1`. A separate read-only smoke run also confirmed that production reports the exact deployed revision and all seven public checks pass.
+
+CI/CD is operational. A recovery rehearsal has not been completed; follow `docs/deployment.md` before relying on rollback during an incident. Continue reviewing every pending migration before dispatching `deploy.yml`.
 
 ## Next session: release readiness
 
