@@ -33,7 +33,7 @@ CI/CD is operational. A recovery rehearsal has not been completed; follow `docs/
 
 ## Desktop validation completed — 2026-09-09
 
-- Built and installed the initial `0.1.0` desktop artifacts, then prepared the aligned `0.1.1` release candidate after the desktop gate passed. Both Omarchy machines now run bytes matching the verified `0.1.1` amd64 archive. No release was published.
+- Built and installed the initial `0.1.0` desktop artifacts, then prepared the aligned `0.1.1` release candidate after the desktop gate passed. No release was published during desktop validation.
 - Production CLI onboarding was completed as `@yamz8` on this machine and `@edwin` on the second laptop. Both installed systemd user services are enabled, active, and remained at zero restarts during the final checks.
 - Fixed CLI onboarding hints being double-escaped in the activation URL, which prevented the browser from prefilling email, handle, and name. Added regression coverage for reserved characters and rebuilt/reinstalled the corrected artifact on both machines.
 - Installed the public repository through `omarchy plugin add ... --enable`. The `com.pokachy.poke` widget is enabled in the right bar and rendered live owner, online, friend-request, friend, and waiting-inbox states without Pokachy QML errors.
@@ -41,6 +41,14 @@ CI/CD is operational. A recovery rehearsal has not been completed; follow `docs/
 - A fresh `0.1.1` candidate `npm run verify` passed all seven stages. Report: `artifacts/verification.json`, started `2026-09-09T08:44:30Z`.
 
 The x86_64 release installer, onboarding, user service, real notification path, and native panel have now passed on actual Omarchy desktops. The arm64 archive is still build-verified only.
+
+## Release v0.1.1 published
+
+- Commit `202f3b4a6ee648512e822ee930a59c083face6ad` passed all four GitHub CI jobs in run `34331377685` before tagging.
+- The guarded release workflow run `34331518475` reran the full verification suite, rebuilt the archives, and published `v0.1.1` as the latest GitHub release on `2026-09-09T08:54:01Z`. It did not deploy the Worker.
+- Downloaded all three public assets and verified both archives against the published `SHA256SUMS`. The amd64 and arm64 archives are present; real arm64 hardware execution remains outstanding.
+- Installed the exact public amd64 binary on both Omarchy laptops. Both copies have SHA-256 `0d436b17ce6a35bb3fde3a9361d9a50f6dcaff182d6be967e4151c1ae892d30a`, retained their authenticated sessions, and run under active enabled user services.
+- Repeated the production two-machine poke with the public binaries and visually confirmed the real Omarchy notification. The test inbox was cleared, DND restored to `on`, and this machine's installed panel updated to manifest `0.1.1` at the release commit.
 
 ## Next session: release readiness
 
