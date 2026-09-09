@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,36 @@ func TestValidServer(t *testing.T) {
 		if err := validServer(raw); err == nil {
 			t.Errorf("validServer(%q) unexpectedly accepted", raw)
 		}
+	}
+}
+
+func TestAddFragmentHintsUsesBrowserDecodableQueryEncoding(t *testing.T) {
+	verification, err := url.Parse("https://pokachy.example/activate?user_code=ABCDEFGH")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hints := url.Values{
+		"email":  {"yam+desktop@example.com"},
+		"handle": {"pokachy user"},
+		"name":   {"Yam & Friends"},
+	}
+
+	got := addFragmentHints(verification, hints)
+	_, encoded, found := strings.Cut(got, "#")
+	if !found {
+		t.Fatalf("URL has no fragment: %q", got)
+	}
+	decoded, err := url.ParseQuery(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range hints {
+		if value := decoded.Get(key); value != want[0] {
+			t.Errorf("%s = %q, want %q (URL %q)", key, value, want[0], got)
+		}
+	}
+	if strings.Contains(got, "%2540") || strings.Contains(got, "%252B") {
+		t.Fatalf("fragment hints were double escaped: %q", got)
 	}
 }
 

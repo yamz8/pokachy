@@ -28,7 +28,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.1.0"
+const version = "0.1.1"
 
 type Config struct {
 	Server string `json:"server"`
@@ -516,6 +516,17 @@ func gitValue(key string) string {
 	}
 	return safe(strings.TrimSpace(string(out)))
 }
+
+func addFragmentHints(verification *url.URL, hints url.Values) string {
+	base := *verification
+	base.Fragment = ""
+	base.RawFragment = ""
+	if encoded := hints.Encode(); encoded != "" {
+		return base.String() + "#" + encoded
+	}
+	return base.String()
+}
+
 func onboarding(args []string) error {
 	flags := flag.NewFlagSet("init", flag.ContinueOnError)
 	server := flags.String("server", "https://pokachy.com", "Pokachy server origin")
@@ -566,10 +577,10 @@ func onboarding(args []string) error {
 	if err != nil || !verification.IsAbs() || verification.User != nil || !sameOrigin(trusted, verification) || verification.Path != "/activate" {
 		return errors.New("server returned an unexpected verification URL")
 	}
-	verification.Fragment = hints.Encode()
-	fmt.Printf("\nYour device code: %s\nSign in with email or GitHub, then approve this code:\n%s\n", safe(codes.UserCode), safe(verification.String()))
+	verificationURL := addFragmentHints(verification, hints)
+	fmt.Printf("\nYour device code: %s\nSign in with email or GitHub, then approve this code:\n%s\n", safe(codes.UserCode), safe(verificationURL))
 	if !*noBrowser {
-		_ = openBrowser(verification.String())
+		_ = openBrowser(verificationURL)
 	}
 	interval := time.Duration(max(codes.Interval, 5)) * time.Second
 	deadline := time.Now().Add(time.Duration(min(codes.ExpiresIn, 900)) * time.Second)

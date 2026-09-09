@@ -31,14 +31,25 @@ GitHub Actions run `34307601788` completed the first end-to-end production deplo
 
 CI/CD is operational. A recovery rehearsal has not been completed; follow `docs/deployment.md` before relying on rollback during an incident. Continue reviewing every pending migration before dispatching `deploy.yml`.
 
+## Desktop validation completed — 2026-09-09
+
+- Built and installed the initial `0.1.0` desktop artifacts, then prepared the aligned `0.1.1` release candidate after the desktop gate passed. Both Omarchy machines now run bytes matching the verified `0.1.1` amd64 archive. No release was published.
+- Production CLI onboarding was completed as `@yamz8` on this machine and `@edwin` on the second laptop. Both installed systemd user services are enabled, active, and remained at zero restarts during the final checks.
+- Fixed CLI onboarding hints being double-escaped in the activation URL, which prevented the browser from prefilling email, handle, and name. Added regression coverage for reserved characters and rebuilt/reinstalled the corrected artifact on both machines.
+- Installed the public repository through `omarchy plugin add ... --enable`. The `com.pokachy.poke` widget is enabled in the right bar and rendered live owner, online, friend-request, friend, and waiting-inbox states without Pokachy QML errors.
+- With Omarchy Do Not Disturb temporarily disabled, `@edwin` sent a production poke from the second laptop. This machine rendered the real desktop toast, cached the matching inbox item, and persisted its ID in `notified.json`. Restarting the daemon did not replay the notification. The test poke was dismissed and DND was restored to its original `on` state.
+- A fresh `0.1.1` candidate `npm run verify` passed all seven stages. Report: `artifacts/verification.json`, started `2026-09-09T08:44:30Z`.
+
+The x86_64 release installer, onboarding, user service, real notification path, and native panel have now passed on actual Omarchy desktops. The arm64 archive is still build-verified only.
+
 ## Next session: release readiness
 
 Reassess the repository before implementing these; this is a handoff, not a claim they are complete:
 
-1. Validate the release installer, user service, real notifications, and native panel on Omarchy. Current tests use temporary installation paths and a mock notifier; ARM archives are built, not executed on ARM hardware.
-2. Complete GitHub OAuth consent/linking and browser device approval against production with authorized accounts. Email sign-in was previously exercised with the owner's authorized inbox. Never assume local laptop setup identity proves email ownership.
-3. Configure the owner's administrator user ID and verify reporting/suspension operations.
-4. Review account deletion, privacy/retention, abuse controls, support contact, monitoring/alerts, and recovery rehearsal before public launch.
-5. Run a small authorized pilot and fix failures before publishing broadly.
+1. Complete GitHub OAuth consent/linking against production with authorized accounts. Email sign-in and browser device approval are verified. Never assume local laptop setup identity proves email ownership.
+2. Configure the owner's administrator user ID and verify reporting/suspension operations.
+3. Review account deletion, privacy/retention, abuse controls, support contact, monitoring/alerts, and recovery rehearsal before public launch.
+4. Run a small authorized pilot and fix failures before publishing broadly.
+5. Execute the arm64 archive on real ARM hardware when available.
 
 The app is not yet declared production-ready. Keep credentials in ignored private files, reports in ignored artifacts, and test fixtures local/disposable. Run `npm run verify` after authentication/API/CLI/daemon/integration changes, with real browser or desktop validation where applicable.
