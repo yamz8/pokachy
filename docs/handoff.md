@@ -50,6 +50,12 @@ The x86_64 release installer, onboarding, user service, real notification path, 
 - Installed the exact public amd64 binary on both Omarchy laptops. Both copies have SHA-256 `0d436b17ce6a35bb3fde3a9361d9a50f6dcaff182d6be967e4151c1ae892d30a`, retained their authenticated sessions, and run under active enabled user services.
 - Repeated the production two-machine poke with the public binaries and visually confirmed the real Omarchy notification. The test inbox was cleared, DND restored to `on`, and this machine's installed panel updated to manifest `0.1.1` at the release commit.
 
+## v0.1.2 connection-race follow-up
+
+- Documentation-only CI run `34332071989` exposed the known five-second Wrangler idle-close race again: device approval and health checks succeeded, but the CLI's first token POST reused a connection as the development proxy closed it. No credentials were saved and the Worker remained healthy.
+- The CLI now closes idle HTTP connections before each device-token attempt. This starts the one-time POST on a fresh connection without retrying redemption or changing authentication semantics. The end-to-end fixture comment now describes the actual protection.
+- Prepared aligned version `0.1.2`. A fresh `npm run verify` passed all seven stages with report start `2026-09-09T09:05:18Z`, followed by three additional consecutive successful `npm run verify:e2e` runs.
+
 ## Next session: release readiness
 
 Reassess the repository before implementing these; this is a handoff, not a claim they are complete:

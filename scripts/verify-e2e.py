@@ -291,10 +291,9 @@ def main() -> None:
         quoted = urllib.parse.quote(code)
         api(base, "/api/auth/device?user_code=" + quoted, token=alice_browser)
         api(base, "/api/auth/device/approve", method="POST", token=alice_browser, body={"userCode": code})
-        # Wrangler's ProxyWorker documents a 5s idle-connection race on its
-        # internal hop to workerd. Device polling uses that same interval.
-        # Keep this disposable dev proxy active with read-only health requests;
-        # never retry the one-time token redemption or alter production auth.
+        # Keep checking the disposable Worker while the CLI waits. The CLI
+        # starts token POSTs on fresh connections so Wrangler's documented 5s
+        # idle close cannot race one-time redemption; neither side retries it.
         completion_deadline = time.monotonic() + 15
         while init.poll() is None and time.monotonic() < completion_deadline:
             check(request(base, "/health")[0] == 200, "worker healthy during device approval")

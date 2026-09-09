@@ -28,7 +28,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.1.1"
+const version = "0.1.2"
 
 type Config struct {
 	Server string `json:"server"`
@@ -590,6 +590,10 @@ func onboarding(args []string) error {
 			return ctx.Err()
 		case <-time.After(interval):
 		}
+		// A device-token POST is deliberately not retried because redemption is
+		// one-time. Avoid racing an intermediary that closes the connection at
+		// the same idle interval by starting each attempt on a fresh connection.
+		c.HTTP.CloseIdleConnections()
 		var auth struct {
 			Token string `json:"access_token"`
 		}

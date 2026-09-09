@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.pokachy.poke",
   "name": "Pokachy",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Pokachy",
   "description": "A little nudge for your Linux friends. Requires the pokachy CLI.",
   "kinds": ["bar-widget"],
