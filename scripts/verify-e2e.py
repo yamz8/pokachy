@@ -295,6 +295,16 @@ def main() -> None:
             init.wait(15)
         except subprocess.TimeoutExpired:
             fail("CLI device completion")
+        if init.returncode != 0:
+            # Print only known categories, never raw output containing device URLs or credentials.
+            stderr = init.stderr.read() if init.stderr is not None else ""
+            known = ("authorization_pending", "slow_down", "invalid_grant", "access_denied",
+                     "expired_token", "server_error", "Unauthorized", "Sign in required",
+                     "could not reach Pokachy", "server returned no device session",
+                     "Internal Server Error", "Too Many Requests", "unexpected redirect")
+            category = next((message for message in known if message in stderr), "unclassified")
+            saved = (cli_dir / "credentials.json").is_file()
+            fail(f"CLI device approval exit {init.returncode}; category={category}; credentials_saved={saved}")
         check(init.returncode == 0, "CLI device approval exit " + str(init.returncode))
         initialized = read_json(cli_dir / "state.json")
         check(isinstance(initialized, dict) and initialized.get("me", {}).get("handle") == "clialice", "CLI authenticated account")
