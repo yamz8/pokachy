@@ -2,7 +2,7 @@
 
 ## Session boundary
 
-This session covers CI/CD and verification only. Stop before desktop installation, Omarchy validation, or other launch features. The owner prefers bounded Luna reviews and Terra implementation, with the primary agent responsible for integration, security, and final verification.
+This handoff began with CI/CD verification and now also records the completed Omarchy desktop installation and release validation. The owner prefers bounded Luna reviews and Terra implementation, with the primary agent responsible for integration, security, and final verification.
 
 ## Implemented
 
@@ -55,6 +55,15 @@ The x86_64 release installer, onboarding, user service, real notification path, 
 - Documentation-only CI run `34332071989` exposed the known five-second Wrangler idle-close race again: device approval and health checks succeeded, but the CLI's first token POST reused a connection as the development proxy closed it. No credentials were saved and the Worker remained healthy.
 - The CLI now closes idle HTTP connections before each device-token attempt. This starts the one-time POST on a fresh connection without retrying redemption or changing authentication semantics. The end-to-end fixture comment now describes the actual protection.
 - Prepared aligned version `0.1.2`. A fresh `npm run verify` passed all seven stages with report start `2026-09-09T09:05:18Z`, followed by three additional consecutive successful `npm run verify:e2e` runs.
+
+## Release v0.1.2 published
+
+- Commit `3979fae11db702f85ba90b4c96b4c87b933435b3` passed all four GitHub CI jobs in run `34332876307` before tagging.
+- Before publication, the exact candidate passed fresh production onboarding in an isolated config, authenticated as `@yamz8`, and the temporary device was then revoked. Both Omarchy laptops ran the candidate under enabled active user services with zero restarts.
+- The candidate passed a real production poke from `@edwin` to `@yamz8`: the Omarchy toast was visually confirmed, the native panel rendered the pending inbox item and actions, and a service restart preserved the notification ledger without replaying the toast. The installed panel is manifest `0.1.2` at the release commit with no Pokachy QML errors.
+- Tag CI run `34335012648` and guarded release workflow run `34335012584` both passed at the same commit. The release workflow reran all seven verification stages, rebuilt the archives, and published `v0.1.2` on `2026-09-09T09:31:35Z`. It did not deploy the Worker.
+- Downloaded all three public assets and verified both archives against the published `SHA256SUMS`. The public archive digests are `553702b1596b15666b5fd0e31ce7199415edb23fe37b60131d7ad4348635d4ae` for amd64 and `5ef6145b8b39e08c78dbd8eec549e54b94d414f512d4f5248e1306c189f28ff0` for arm64.
+- Installed the exact public amd64 binary on both laptops. Both copies have SHA-256 `44044f9056aedd1fe60cf4fcff5b76ef6b1eb898200117a04fe86b211b0ea7d0`, retained their authenticated sessions, and passed another visually confirmed production poke. The test inbox was cleared and Omarchy DND was explicitly restored to its original `on` state.
 
 ## Next session: release readiness
 
