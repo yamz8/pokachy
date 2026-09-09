@@ -230,7 +230,20 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 	}
 	response, err := hc.Do(req)
 	if err != nil {
-		return errors.New("could not reach Pokachy; check your connection")
+		category := "network error"
+		switch {
+		case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF):
+			category = "connection closed"
+		case errors.Is(err, context.Canceled):
+			category = "request canceled"
+		case errors.Is(err, context.DeadlineExceeded):
+			category = "request timed out"
+		case errors.Is(err, syscall.ECONNREFUSED):
+			category = "connection refused"
+		case errors.Is(err, syscall.ECONNRESET):
+			category = "connection reset"
+		}
+		return fmt.Errorf("could not reach Pokachy (%s); check your connection", category)
 	}
 	defer response.Body.Close()
 	if response.StatusCode >= 300 && response.StatusCode < 400 {

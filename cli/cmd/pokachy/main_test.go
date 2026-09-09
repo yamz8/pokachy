@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -156,5 +157,32 @@ func TestPokeAcknowledgementIsNotHiddenByRefreshFailure(t *testing.T) {
 	}
 	if err := run([]string{"poke", "@friend"}); err != nil {
 		t.Fatalf("successful poke should not fail when cache refresh fails: %v", err)
+	}
+}
+
+type failingTransport struct{ err error }
+
+func (t failingTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, t.err }
+
+func TestTransportFailureDiagnosticsDoNotExposeRequestDetails(t *testing.T) {
+	for _, tc := range []struct {
+		err      error
+		category string
+	}{
+		{io.EOF, "connection closed"},
+		{context.Canceled, "request canceled"},
+		{context.DeadlineExceeded, "request timed out"},
+		{errors.New("private-token-and-host"), "network error"},
+	} {
+		c := Client{Config: Config{Server: "https://private.example", Token: "secret-token"}, HTTP: &http.Client{Transport: failingTransport{tc.err}}}
+		err := c.request(context.Background(), "POST", "/api/auth/device/token", map[string]string{"device_code": "private-code"}, nil, "")
+		if err == nil || !strings.Contains(err.Error(), "("+tc.category+")") {
+			t.Fatalf("missing category: %v", err)
+		}
+		for _, secret := range []string{"private", "secret-token", "/api/auth"} {
+			if strings.Contains(err.Error(), secret) {
+				t.Fatalf("request details leaked: %v", err)
+			}
+		}
 	}
 }

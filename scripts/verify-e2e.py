@@ -291,20 +291,30 @@ def main() -> None:
         quoted = urllib.parse.quote(code)
         api(base, "/api/auth/device?user_code=" + quoted, token=alice_browser)
         api(base, "/api/auth/device/approve", method="POST", token=alice_browser, body={"userCode": code})
-        try:
-            init.wait(15)
-        except subprocess.TimeoutExpired:
+        # Wrangler's ProxyWorker documents a 5s idle-connection race on its
+        # internal hop to workerd. Device polling uses that same interval.
+        # Keep this disposable dev proxy active with read-only health requests;
+        # never retry the one-time token redemption or alter production auth.
+        completion_deadline = time.monotonic() + 15
+        while init.poll() is None and time.monotonic() < completion_deadline:
+            check(request(base, "/health")[0] == 200, "worker healthy during device approval")
+            try:
+                init.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+        if init.poll() is None:
             fail("CLI device completion")
         if init.returncode != 0:
             # Print only known categories, never raw output containing device URLs or credentials.
             stderr = init.stderr.read() if init.stderr is not None else ""
-            known = ("authorization_pending", "slow_down", "invalid_grant", "access_denied",
+            known = ("connection closed", "request canceled", "request timed out", "connection refused", "connection reset", "authorization_pending", "slow_down", "invalid_grant", "access_denied",
                      "expired_token", "server_error", "Unauthorized", "Sign in required",
                      "could not reach Pokachy", "server returned no device session",
                      "Internal Server Error", "Too Many Requests", "unexpected redirect")
             category = next((message for message in known if message in stderr), "unclassified")
             saved = (cli_dir / "credentials.json").is_file()
-            fail(f"CLI device approval exit {init.returncode}; category={category}; credentials_saved={saved}")
+            health = request(base, "/health")[0]
+            fail(f"CLI device approval exit {init.returncode}; category={category}; credentials_saved={saved}; worker_exit={worker.poll()}; health={health}")
         check(init.returncode == 0, "CLI device approval exit " + str(init.returncode))
         initialized = read_json(cli_dir / "state.json")
         check(isinstance(initialized, dict) and initialized.get("me", {}).get("handle") == "clialice", "CLI authenticated account")
