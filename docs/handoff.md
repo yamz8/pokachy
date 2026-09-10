@@ -83,11 +83,19 @@ The x86_64 release installer, onboarding, user service, real notification path, 
 - After signing out of the Pokachy browser session, **Continue with GitHub** returned to the existing `@yamz8` profile rather than creating a duplicate account. This verifies production callback configuration, explicit account linking, and subsequent GitHub sign-in.
 - GitHub reused an existing authorization, so a fresh first-consent screen was not rendered. Reauthorizing from a revoked grant remains optional if the exact first-consent UI must be exercised; do not revoke the owner's working grant casually.
 
+## Production administrator configured — 2026-09-11
+
+- The owner's immutable Better Auth user ID was read directly from production D1 and stored as the Worker secret `ADMIN_USER_IDS`; the value was not committed or printed. Production configuration now declares the secret as required, and the deployment preflight checks for it.
+- Added Worker coverage for report creation and review, self-suspension protection, successful suspension of a disposable user, and immediate revocation of that user's session. A fresh `npm run verify` passed all seven stages from report start `2026-09-10T21:09:31.760146+00:00`; all nine Worker tests passed.
+- Commit `00cbe69910e8b6a232aa122e7358dcd796d53257` passed all four push CI jobs in run `34530714856`. Guarded deployment run `34530984134` independently passed the full suite and dry run, captured recovery metadata, confirmed there were no pending migrations, deployed the same commit, and passed its revision-aware live smoke check.
+- The owner's existing production CLI session received administrator access: `GET /api/admin/reports` returned an authorized empty list. `POST /api/admin/suspend/adminchecknonexistent` returned the expected 404 after D1 confirmed the handle did not exist. No production report, account suspension, or session revocation was created during this safe check.
+- A positive production report/suspension test still requires an explicitly disposable authorized account. Never use `@yamz8` or `@edwin` for it because suspension revokes all sessions.
+
 ## Next session: release readiness
 
 Reassess the repository before implementing these; this is a handoff, not a claim they are complete:
 
-1. Configure the owner's administrator user ID and verify reporting/suspension operations.
+1. Complete a positive production report/suspension/session-revocation check with an explicitly disposable authorized account.
 2. Review account deletion, privacy/retention, abuse controls, support contact, monitoring/alerts, and recovery rehearsal before public launch.
 3. Run a small authorized pilot and fix failures before publishing broadly.
 4. Execute the arm64 archive on real ARM hardware when available.
