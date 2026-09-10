@@ -67,7 +67,7 @@ Code rollback does not reverse D1 changes. Cloudflare also restricts rollback ac
 
 ## Administrator
 
-After the owner's email is verified, configure `ADMIN_USER_IDS` with their Better Auth user ID (comma-separated for multiple administrators). Authorization uses IDs rather than claimed handles or emails. Endpoints: `GET /api/admin/reports` and `POST /api/admin/suspend/:handle`. Suspension revokes all that user's sessions.
+After the owner's email is verified, configure the Worker secret `ADMIN_USER_IDS` with their Better Auth user ID (comma-separated for multiple administrators). Use Wrangler's hidden `secret put` prompt or the Cloudflare dashboard; never commit the IDs or pass them in command arguments. Authorization uses IDs rather than claimed handles or emails. Endpoints: `GET /api/admin/reports` and `POST /api/admin/suspend/:handle`. Suspension revokes all that user's sessions.
 
 ## Releases
 

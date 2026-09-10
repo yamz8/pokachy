@@ -77,14 +77,19 @@ The x86_64 release installer, onboarding, user service, real notification path, 
 - Downloaded the three public release assets and verified both archives against the published `SHA256SUMS`. Public archive digests are `dd1763890c236a81685750fd64ef3a750e904756f8d600278daf3feedf94d5b4` for amd64 and `8bcff3dc48a5aac340ef2a15d1dd5a10bfaedfaf43efde4c38fed5951c45367c` for arm64.
 - Installed the exact public amd64 artifact on both Omarchy laptops. Both binaries have SHA-256 `0f3cb98c0866272640a7c161e48115a08dcd4bbb130d98a37a28f31ee3956646`, retained their sessions, and run in enabled active services with zero restarts. A final public-binary production poke rendered the real toast and native inbox, keyboard Dismiss cleared it, both accounts ended clean and online, Pokachy quiet mode is off, and Omarchy DND is explicitly `on`.
 
+## Production GitHub OAuth validation — 2026-09-11
+
+- While signed into the existing production `@yamz8` account, **Link GitHub to this account** completed its OAuth round trip and returned to the same profile without a visible or console error.
+- After signing out of the Pokachy browser session, **Continue with GitHub** returned to the existing `@yamz8` profile rather than creating a duplicate account. This verifies production callback configuration, explicit account linking, and subsequent GitHub sign-in.
+- GitHub reused an existing authorization, so a fresh first-consent screen was not rendered. Reauthorizing from a revoked grant remains optional if the exact first-consent UI must be exercised; do not revoke the owner's working grant casually.
+
 ## Next session: release readiness
 
 Reassess the repository before implementing these; this is a handoff, not a claim they are complete:
 
-1. Complete GitHub OAuth consent/linking against production with authorized accounts. Email sign-in and browser device approval are verified. Never assume local laptop setup identity proves email ownership.
-2. Configure the owner's administrator user ID and verify reporting/suspension operations.
-3. Review account deletion, privacy/retention, abuse controls, support contact, monitoring/alerts, and recovery rehearsal before public launch.
-4. Run a small authorized pilot and fix failures before publishing broadly.
-5. Execute the arm64 archive on real ARM hardware when available.
+1. Configure the owner's administrator user ID and verify reporting/suspension operations.
+2. Review account deletion, privacy/retention, abuse controls, support contact, monitoring/alerts, and recovery rehearsal before public launch.
+3. Run a small authorized pilot and fix failures before publishing broadly.
+4. Execute the arm64 archive on real ARM hardware when available.
 
 The app is not yet declared production-ready. Keep credentials in ignored private files, reports in ignored artifacts, and test fixtures local/disposable. Run `npm run verify` after authentication/API/CLI/daemon/integration changes, with real browser or desktop validation where applicable.

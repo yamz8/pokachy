@@ -56,6 +56,22 @@ test("email onboarding, consent, idempotency, concurrency, reply, block and isol
   expect((await request("/api/state",a.token)).status).toBe(401);
 });
 
+test("administrators can review reports and suspend another user",async()=>{
+  const admin=await user("adminuser"),reported=await user("reporteduser"),reporter=await user("reporteruser");
+  expect((await request("/api/reports/reporteduser",reporter.token,"POST",{reason:"Authorized abuse report test"})).status).toBe(200);
+  const adminEnv={...env,ADMIN_USER_IDS:admin.user.id} as typeof env;
+  const adminRequest=(path:string,method="GET")=>worker.fetch(new Request(origin+path,{
+    method,headers:{"Content-Type":"application/json","X-Pokachy-Client":"cli","CF-Connecting-IP":`192.0.2.${testIP}`,Authorization:`Bearer ${admin.token}`},
+    body:method==="GET"?undefined:"{}",
+  }),adminEnv,ctx);
+  const reports=await adminRequest("/api/admin/reports");
+  expect(reports.status).toBe(200);
+  expect(await reports.json()).toEqual(expect.arrayContaining([expect.objectContaining({handle:"reporteduser",reason:"Authorized abuse report test"})]));
+  expect((await adminRequest("/api/admin/suspend/adminuser","POST")).status).toBe(404);
+  expect((await adminRequest("/api/admin/suspend/reporteduser","POST")).status).toBe(200);
+  expect((await request("/api/state",reported.token)).status).toBe(401);
+});
+
 test("device onboarding requires explicit approval and a one-time redemption",async()=>{
   const u=await user("deviceuser");
   const started=await request("/api/auth/device/code",undefined,"POST",{client_id:"pokachy-cli"});

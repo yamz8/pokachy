@@ -21,8 +21,8 @@
   "env": {
     "production": {
       "name": "pokachy",
-      "secrets": {"required": ["BETTER_AUTH_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "TURNSTILE_SECRET"]},
-      "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>", "ADMIN_USER_IDS": ""},
+      "secrets": {"required": ["ADMIN_USER_IDS", "BETTER_AUTH_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "TURNSTILE_SECRET"]},
+      "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>"},
       "routes": [{"pattern": "pokachy.com", "custom_domain": true}],
       "d1_databases": [{"binding": "DB", "database_name": "pokachy", "database_id": "0cd8e576-f169-42bb-b944-42b60ef5e44e", "migrations_dir": "migrations"}],
       "durable_objects": {"bindings": [{"name": "HUBS", "class_name": "UserHub"}]},

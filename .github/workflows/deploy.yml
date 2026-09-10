@@ -76,7 +76,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Set the production environment CLOUDFLARE_API_TOKEN secret.' >&2; exit 1; }
           npx --no-install wrangler secret list --env production --format json > "$RUNNER_TEMP/pokachy-secret-names.json"
-          python3 -c 'import json,sys; names={s["name"] for s in json.load(open(sys.argv[1]))}; required={"BETTER_AUTH_SECRET","GITHUB_CLIENT_ID","GITHUB_CLIENT_SECRET","TURNSTILE_SECRET"}; missing=required-names; sys.exit("Missing Worker secrets: " + ", ".join(sorted(missing)) if missing else 0)' "$RUNNER_TEMP/pokachy-secret-names.json"
+          python3 -c 'import json,sys; names={s["name"] for s in json.load(open(sys.argv[1]))}; required={"ADMIN_USER_IDS","BETTER_AUTH_SECRET","GITHUB_CLIENT_ID","GITHUB_CLIENT_SECRET","TURNSTILE_SECRET"}; missing=required-names; sys.exit("Missing Worker secrets: " + ", ".join(sorted(missing)) if missing else 0)' "$RUNNER_TEMP/pokachy-secret-names.json"
           mkdir -p ../artifacts/recovery
           npx --no-install wrangler deployments list --env production --json > ../artifacts/recovery/deployments-before.json
           npx --no-install wrangler d1 time-travel info pokachy --env production --json > ../artifacts/recovery/d1-before.json
