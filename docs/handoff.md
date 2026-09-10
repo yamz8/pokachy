@@ -65,6 +65,16 @@ The x86_64 release installer, onboarding, user service, real notification path, 
 - Downloaded all three public assets and verified both archives against the published `SHA256SUMS`. The public archive digests are `553702b1596b15666b5fd0e31ce7199415edb23fe37b60131d7ad4348635d4ae` for amd64 and `5ef6145b8b39e08c78dbd8eec549e54b94d414f512d4f5248e1306c189f28ff0` for arm64.
 - Installed the exact public amd64 binary on both laptops. Both copies have SHA-256 `44044f9056aedd1fe60cf4fcff5b76ef6b1eb898200117a04fe86b211b0ea7d0`, retained their authenticated sessions, and passed another visually confirmed production poke. The test inbox was cleared and Omarchy DND was explicitly restored to its original `on` state.
 
+## v0.1.3 native-panel follow-up — 2026-09-10
+
+- The panel now gives immediate `Sending…` feedback, disables a poke while it is unanswered, shows `Waiting` until the recipient answers or dismisses it, and displays CLI success output. This matches the server's one-outstanding-poke rule instead of leaving an apparently inert `Poke` button.
+- Standard controls are keyboard reachable through Qt's native Tab chain, Return/Enter activates them, and Escape closes the panel. Live keyboard checks covered Quiet/Resume, Add, Poke, Back, Dismiss, Remove, Cancel, Accept, Decline, Block, and Unblock; invalid friend input rendered the CLI error without losing focus.
+- CLI processes are launched through `/usr/bin/env` with argument arrays. A missing executable now produces a friendly installed-CLI error rather than looking logged out, and the live watcher automatically clears the error and reconnects when the executable returns.
+- Logged-out, missing-CLI, and recovery states rendered in the actual Omarchy shell. Both authorized accounts were exercised through the full friendship state matrix and restored as mutual friends with empty inboxes and block lists.
+- A real production poke from `@edwin` produced the Omarchy desktop toast and live native inbox. The exact `0.1.3` amd64 candidate was installed on both laptops (binary SHA-256 `c657ebb03f7f0cd3d598fe134e87b6dcdb11e86b9df22d8c7dc2ce4ea72c9270`), and its final toast/panel/dismiss round trip passed. Both user services are enabled and active with zero restarts; account quiet mode is off and Omarchy DND is restored to `on`.
+- Fresh `npm run verify` passed all seven stages from report start `2026-09-10T09:08:50.671641+00:00`. The first sandboxed attempt stopped at `listen EPERM` because local binding was denied; the exact suite passed after granting the isolated Worker permission. No Pokachy QML errors appeared in the final shell logs. The arm64 archive remains build/install verified only.
+- `v0.1.3` has not yet been published. Commit the candidate, require green CI at that commit, and only then tag it; after release, verify public checksums and reinstall the public artifact on both laptops before recording publication.
+
 ## Next session: release readiness
 
 Reassess the repository before implementing these; this is a handoff, not a claim they are complete:
