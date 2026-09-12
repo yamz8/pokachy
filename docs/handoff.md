@@ -110,7 +110,7 @@ The app is not yet declared production-ready. Keep credentials in ignored privat
 - Aligned the README and Omarchy manifest around “A tiny way to say hey to your Linux friends.” The native panel was intentionally left unchanged and continues to inherit Omarchy’s own visual system.
 - Browser validation covered the signed-in desktop layout and a 390 × 844 narrow viewport. No console warnings or errors appeared. A fresh `npm run verify` passed all seven stages; report started `2026-09-11T12:34:48.174136+00:00`.
 
-Continue from this system rather than introducing a separate style. Useful next polish slices are the email-code/handle/device-approval browser states, native panel spacing and action hierarchy on a live Omarchy shell, and release/social artwork derived from the pixel hand mark. The native panel was not changed or reopened during this initial pass.
+Continue from this system rather than introducing a separate style. The browser onboarding states listed below are now complete. Useful next polish slices are native panel spacing and action hierarchy on a live Omarchy shell, and release/social artwork derived from the pixel hand mark. The native panel was not changed or reopened during the browser-state passes.
 
 ### Logo step
 
@@ -136,4 +136,7 @@ Continue from this system rather than introducing a separate style. Useful next 
 - **Errors:** Replaced loose status text with compact branded notices that distinguish errors from success and switch to assertive alert semantics only when needed. Added a dedicated “We lost the signal” recovery state for startup failures and a specific expired-device-code state that directs people back to their account and tells them to run `pokachy init` again instead of retrying a dead code.
 - Validated a recoverable handle error, a full connection failure, and an expired-code recovery path. Desktop and 390 × 844 layouts keep the message and recovery action inside the account card with no horizontal overflow; alert roles and action labels are exposed correctly, and no browser warnings or errors appeared.
 - A fresh `npm run verify` passed all seven stages; report started `2026-09-12T16:01:17.118963+00:00`.
-- The connected/session state remains the final browser-state approval step.
+- **Connected and sessions:** Turned the signed-in view into a compact account dashboard with a prominent handle/status block, a labeled terminal quick start, a collapsible signed-in-device section, concise browser and CLI names, sign-in dates, and clearly labeled revoke actions. The device list now exposes its expanded state, handles missing user-agent metadata, and returns to a refreshed account state after revocation.
+- Validated the collapsed dashboard and an expanded two-device list in desktop and 390 × 844 browser layouts. Identity, commands, device rows, revoke actions, and browser sign-out remain readable without horizontal overflow; the device list collapses correctly, semantic labels are exposed, and no browser warnings or errors appeared.
+- A fresh `npm run verify` passed all seven stages; report started `2026-09-12T16:07:05.179798+00:00`.
+- Signed-out, email-code, handle-creation, device-approval, error, and connected/session browser states are now polished and validated as one system.
