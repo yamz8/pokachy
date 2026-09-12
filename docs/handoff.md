@@ -110,7 +110,7 @@ The app is not yet declared production-ready. Keep credentials in ignored privat
 - Aligned the README and Omarchy manifest around “A tiny way to say hey to your Linux friends.” The native panel was intentionally left unchanged and continues to inherit Omarchy’s own visual system.
 - Browser validation covered the signed-in desktop layout and a 390 × 844 narrow viewport. No console warnings or errors appeared. A fresh `npm run verify` passed all seven stages; report started `2026-09-11T12:34:48.174136+00:00`.
 
-Continue from this system rather than introducing a separate style. Useful next polish slices are the logged-out/code/device-approval browser states, native panel spacing and action hierarchy on a live Omarchy shell, and release/social artwork derived from the pixel hand mark. The native panel was not changed or reopened during this initial pass.
+Continue from this system rather than introducing a separate style. Useful next polish slices are the email-code/handle/device-approval browser states, native panel spacing and action hierarchy on a live Omarchy shell, and release/social artwork derived from the pixel hand mark. The native panel was not changed or reopened during this initial pass.
 
 ### Logo step
 
@@ -118,3 +118,10 @@ Continue from this system rather than introducing a separate style. Useful next 
 - Added a hand-only monochrome bar variant with all signal rings and peripheral particles removed so it matches the visual height and density of neighboring Omarchy icons. Omarchy recolors it from the active theme, dims it while setup is required, and retains the shell's urgent color for a waiting poke.
 - Visually checked the full-color mark at desktop and narrow browser sizes, then loaded the monochrome asset into the real Omarchy top bar and confirmed that the shell restarted without a Pokachy QML error. Its centered render size is 75% of Omarchy's theme-scaled icon canvas, so it tracks neighboring glyphs instead of filling the whole slot. A fresh `npm run verify` passed all seven stages; report started `2026-09-12T10:52:43.976599+00:00`.
 - This step is intentionally limited to the symbol. Color, typography, composition, onboarding-state polish, and broader native-panel styling remain separate approval steps.
+
+### Browser state polish
+
+- **Signed out:** Reframed the account card around one immediate task with the heading “Come say hey,” explicit sign-in-or-account-creation language, a clearer email-code action, accurate email privacy copy, and a concise automatic-account note. Improved the field and supporting-copy sizing without changing authentication behavior.
+- Validated the signed-out state in desktop and 390 × 844 browser layouts. The email field and primary action remain visible in the first mobile viewport, semantic labels are exposed correctly, and no browser warnings or errors appeared.
+- A fresh `npm run verify` passed all seven stages; report started `2026-09-12T14:39:00.955649+00:00`.
+- Email-code, handle-creation, device-approval, error, and connected/session states remain separate approval steps.

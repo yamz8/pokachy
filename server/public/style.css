@@ -92,12 +92,13 @@ h1 em { color: var(--signal); font-family: Georgia, "Times New Roman", serif; fo
 h2 { margin: 27px 0 5px; font-size: 31px; line-height: 1.15; letter-spacing: -.035em; }
 .muted { color: var(--muted); }
 #card-description { margin: 0 0 27px; font-size: 14px; }
+#auth { margin-top: 2px; }
 .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 12px/1 var(--mono); }
 .loading span { width: 7px; height: 7px; border-radius: 50%; background: var(--signal); animation: pulse 1.3s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .3; transform: scale(.7); } }
-label { display: flex; justify-content: space-between; margin: 20px 0 8px; color: #daddd3; font: 12px/1.4 var(--mono); }
+label { display: flex; justify-content: space-between; gap: 16px; margin: 20px 0 8px; color: #daddd3; font: 14px/1.4 var(--mono); }
 label span { color: var(--faint); font-size: 12px; }
-input { width: 100%; min-width: 0; padding: 13px 14px; border: 1px solid #495046; border-radius: 4px; outline: none; background: #111410; color: var(--paper); }
+input { width: 100%; min-width: 0; min-height: 48px; padding: 13px 14px; border: 1px solid #495046; border-radius: 4px; outline: none; background: #111410; color: var(--paper); }
 input:hover { border-color: #626b5e; }
 input:focus { border-color: var(--signal); box-shadow: 0 0 0 3px rgba(201,255,114,.1); }
 input::placeholder { color: #6f776c; }
@@ -108,10 +109,13 @@ input::placeholder { color: #6f776c; }
 .button:active { transform: translateY(0); }
 .button.secondary { border-color: #4b5348; background: transparent; color: var(--paper); }
 .button.secondary:hover { border-color: var(--signal); color: var(--signal); }
+.provider-button { margin-top: 0; }
 .full { width: 100%; margin-top: 14px; }
 .divider { display: flex; align-items: center; gap: 12px; margin: 23px 0 2px; color: var(--faint); font: 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .07em; }
 .divider::before, .divider::after { content: ""; height: 1px; flex: 1; background: var(--line); }
 .fine { margin: 18px 0 0; color: var(--faint); font-size: 12px; line-height: 1.6; }
+.auth-help { display: flex; gap: 9px; align-items: flex-start; padding-top: 15px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.auth-help span { flex: 0 0 auto; color: var(--signal); }
 .text-button { padding: 9px 0; border: 0; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
 .text-button:hover { color: var(--signal); }
 .handle-input { display: flex; align-items: center; gap: 10px; color: var(--signal); font: 19px/1 var(--mono); }

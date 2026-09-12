@@ -21,7 +21,7 @@ async function refresh() {
   $("loading").hidden=true;
   $("auth").hidden=!!session;$("signout").hidden=!session;
   for(const id of ["profile-form","approve","connected"]) $(id).hidden=true;
-  if(!session) return;
+  if(!session){$("card-title").textContent="Come say hey.";$("card-description").textContent="Sign in or create an account. No password required.";return;}
   state=await api("/api/state");
   if(!state.me.handle){$("profile-form").hidden=false;$("handle").value=hints.handle||"";$("card-title").textContent="Claim your corner.";return;}
   $("identity").textContent=`Hey, @${state.me.handle}.`;
