@@ -91,11 +91,11 @@
       </form>
 
       <div id="approve" hidden>
-        <p>Your terminal is asking to connect this device.</p>
-        <div class="device-code" id="device-code"></div>
-        <p class="fine">Only approve if this code matches your own terminal.</p>
-        <button id="approve-button" class="button full"><span>Connect my device</span><b>→</b></button>
-        <button id="deny-button" class="text-button">Deny this request</button>
+        <div class="device-code-label"><span>Terminal code</span><span>Pokachy CLI</span></div>
+        <output class="device-code" id="device-code" aria-label="Device confirmation code"></output>
+        <p class="device-help"><span aria-hidden="true">✳</span><span>Only continue if you started this request on your own computer.</span></p>
+        <button id="approve-button" class="button full"><span>Yes, connect this desktop</span><b>→</b></button>
+        <button id="deny-button" class="text-button deny-device">No, deny this request</button>
       </div>
 
       <div id="connected" hidden>

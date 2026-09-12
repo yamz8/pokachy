@@ -127,7 +127,13 @@ input::placeholder { color: #6f776c; }
 .handle-input input:hover, .handle-input input:focus { border: 0; box-shadow: none; }
 .handle-input input:focus-visible { outline: none; }
 .handle-help { margin-top: 10px; }
-.device-code { padding: 19px; border: 1px dashed #5a6454; border-radius: 4px; background: #111410; color: var(--signal); font: 28px/1 var(--mono); letter-spacing: 5px; text-align: center; }
+.device-code-label { display: flex; justify-content: space-between; margin: 21px 0 8px; color: var(--faint); font: 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+.device-code-label span:first-child { color: #daddd3; }
+.device-code { display: block; padding: 20px 15px; overflow-wrap: anywhere; border: 1px solid #596553; border-left: 3px solid var(--signal); border-radius: 4px; background: linear-gradient(105deg, var(--signal-soft), #111410); color: var(--signal); font: 700 28px/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: .18em; text-align: center; text-indent: .18em; }
+.device-help { display: flex; gap: 9px; align-items: flex-start; margin: 13px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.device-help > span:first-child { flex: 0 0 auto; color: var(--reply); }
+.deny-device { display: block; margin: 9px auto 0; }
+.deny-device:hover { color: var(--reply); }
 .connected-badge { display: flex; align-items: center; gap: 10px; margin-top: 20px; color: var(--signal); font: 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .connected-badge span { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 4px rgba(201,255,114,.1); }
 .command { display: block; margin: 8px 0; padding: 12px; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 3px; background: #121511; color: #d8dbd2; font: 12px/1.5 var(--mono); }
