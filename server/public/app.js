@@ -23,14 +23,14 @@ async function refresh() {
   for(const id of ["profile-form","approve","connected"]) $(id).hidden=true;
   if(!session) return;
   state=await api("/api/state");
-  if(!state.me.handle){$("profile-form").hidden=false;$("handle").value=hints.handle||"";$("card-title").textContent="What should friends call you?";return;}
-  $("identity").textContent=`Hello, @${state.me.handle}.`;
+  if(!state.me.handle){$("profile-form").hidden=false;$("handle").value=hints.handle||"";$("card-title").textContent="Claim your corner.";return;}
+  $("identity").textContent=`Hey, @${state.me.handle}.`;
   if(userCode){
     const device=await api(`/api/auth/device?user_code=${encodeURIComponent(userCode)}`);
     if(device.status!=="pending"||device.client_id!=="pokachy-cli") throw new Error("This device request is unavailable. Start pokachy init again.");
-    $("approve").hidden=false;$("device-code").textContent=userCode;$("card-title").textContent="Your desktop is ready.";
+    $("approve").hidden=false;$("device-code").textContent=userCode;$("card-title").textContent="Connect this desktop.";
   }
-  else {$("connected").hidden=false;$("card-title").textContent="Make someone’s day.";$("link-github").hidden=!config.github;}
+  else {$("connected").hidden=false;$("card-title").textContent="Send a tiny signal.";$("link-github").hidden=!config.github;}
 }
 busy($("email-form"),async()=>{
   if(!config.local&&!turnstileToken) throw new Error("Complete the verification first.");

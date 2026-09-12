@@ -101,3 +101,20 @@ Reassess the repository before implementing these; this is a handoff, not a clai
 4. Execute the arm64 archive on real ARM hardware when available.
 
 The app is not yet declared production-ready. Keep credentials in ignored private files, reports in ignored artifacts, and test fixtures local/disposable. Run `npm run verify` after authentication/API/CLI/daemon/integration changes, with real browser or desktop validation where applicable.
+
+## UI and brand polish — 2026-09-11
+
+- Established the initial brand direction as “a tiny desktop signal”: near-black utility surfaces, chartreuse for the outgoing signal, coral for the reply, warm paper text, compact mono labels, and an initial round `p` + ping mark that was superseded in the logo step below.
+- Reworked the browser onboarding into a clearer account surface beside a product-specific terminal exchange. The account card moves ahead of the narrative on narrow screens so activation and sign-in stay primary.
+- Refined the landing copy, download hierarchy, connected state, device language, form treatments, focus states, loading motion, reduced-motion behavior, and responsive layout without changing authentication behavior.
+- Aligned the README and Omarchy manifest around “A tiny way to say hey to your Linux friends.” The native panel was intentionally left unchanged and continues to inherit Omarchy’s own visual system.
+- Browser validation covered the signed-in desktop layout and a 390 × 844 narrow viewport. No console warnings or errors appeared. A fresh `npm run verify` passed all seven stages; report started `2026-09-11T12:34:48.174136+00:00`.
+
+Continue from this system rather than introducing a separate style. Useful next polish slices are the logged-out/code/device-approval browser states, native panel spacing and action hierarchy on a live Omarchy shell, and release/social artwork derived from the pixel hand mark. The native panel was not changed or reopened during this initial pass.
+
+### Logo step
+
+- Replaced the temporary round `p` with the approved pixel hand-and-signal artwork. The supplied artwork was cleaned into a transparent full-color web mark and a matching dark-backed favicon.
+- Added a hand-only monochrome bar variant with all signal rings and peripheral particles removed so it matches the visual height and density of neighboring Omarchy icons. Omarchy recolors it from the active theme, dims it while setup is required, and retains the shell's urgent color for a waiting poke.
+- Visually checked the full-color mark at desktop and narrow browser sizes, then loaded the monochrome asset into the real Omarchy top bar and confirmed that the shell restarted without a Pokachy QML error. Its centered render size is 75% of Omarchy's theme-scaled icon canvas, so it tracks neighboring glyphs instead of filling the whole slot. A fresh `npm run verify` passed all seven stages; report started `2026-09-12T10:52:43.976599+00:00`.
+- This step is intentionally limited to the symbol. Color, typography, composition, onboarding-state polish, and broader native-panel styling remain separate approval steps.

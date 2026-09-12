@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import qs.Commons
 import qs.Ui
 
@@ -43,8 +44,30 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     slotSize: Style.bar.statusSlot
-    text: panelLoader.item && panelLoader.item.needsLogin ? "󰍹"
-      : (panelLoader.item && panelLoader.item.inboxCount > 0 ? "󰍴" : "󰍳")
+    iconComponent: Component {
+      Item {
+        readonly property real iconSize: Math.round(Math.min(width, height) * 0.75)
+
+        Image {
+          id: pokachyIconSource
+          anchors.centerIn: parent
+          width: parent.iconSize
+          height: parent.iconSize
+          source: Qt.resolvedUrl("pokachy-bar-icon.png")
+          fillMode: Image.PreserveAspectFit
+          smooth: false
+          visible: false
+          layer.enabled: true
+        }
+        MultiEffect {
+          anchors.fill: pokachyIconSource
+          source: pokachyIconSource
+          colorization: 1.0
+          colorizationColor: button.active && button.useActiveColor ? button.activeColor : button.foreground
+          opacity: panelLoader.item && panelLoader.item.needsLogin ? 0.55 : 1.0
+        }
+      }
+    }
     active: panelLoader.item && panelLoader.item.inboxCount > 0
     tooltipText: panelLoader.item ? panelLoader.item.barTooltip : "Pokachy"
     onPressed: function(mouseButton) {
