@@ -119,7 +119,14 @@ input::placeholder { color: #6f776c; }
 .change-email { display: block; margin: 9px auto 0; color: var(--muted); }
 .text-button { padding: 9px 0; border: 0; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
 .text-button:hover { color: var(--signal); }
-.handle-input { display: flex; align-items: center; gap: 10px; color: var(--signal); font: 19px/1 var(--mono); }
+.handle-input { display: flex; align-items: center; min-height: 48px; padding-left: 14px; border: 1px solid #495046; border-radius: 4px; background: #111410; color: var(--signal); font: 19px/1 var(--mono); transition: border-color 150ms ease, box-shadow 150ms ease; }
+.handle-input:hover { border-color: #626b5e; }
+.handle-input:focus-within { border-color: var(--signal); box-shadow: 0 0 0 3px rgba(201,255,114,.1); }
+.handle-input > span { flex: 0 0 auto; }
+.handle-input input { min-height: 46px; padding-left: 4px; border: 0; background: transparent; font: inherit; box-shadow: none; }
+.handle-input input:hover, .handle-input input:focus { border: 0; box-shadow: none; }
+.handle-input input:focus-visible { outline: none; }
+.handle-help { margin-top: 10px; }
 .device-code { padding: 19px; border: 1px dashed #5a6454; border-radius: 4px; background: #111410; color: var(--signal); font: 28px/1 var(--mono); letter-spacing: 5px; text-align: center; }
 .connected-badge { display: flex; align-items: center; gap: 10px; margin-top: 20px; color: var(--signal); font: 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .connected-badge span { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 4px rgba(201,255,114,.1); }

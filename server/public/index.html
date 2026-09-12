@@ -84,10 +84,10 @@
       </div>
 
       <form id="profile-form" hidden>
-        <label for="handle">Choose your handle</label>
-        <div class="handle-input"><span>@</span><input id="handle" pattern="[a-z0-9][a-z0-9_]{2,23}" minlength="3" maxlength="24" required autocomplete="username" placeholder="yourname"></div>
-        <p class="fine">3–24 lowercase letters, numbers, or underscores.</p>
-        <button class="button full" type="submit"><span>Save my handle</span><b>→</b></button>
+        <label for="handle">Your handle <span>public</span></label>
+        <div class="handle-input"><span aria-hidden="true">@</span><input id="handle" pattern="[a-z0-9][a-z0-9_]{2,23}" minlength="3" maxlength="24" required autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="handle-help" placeholder="yourname"></div>
+        <p id="handle-help" class="fine handle-help">3–24 lowercase letters, numbers, or underscores.</p>
+        <button class="button full" type="submit"><span>Claim this handle</span><b>→</b></button>
       </form>
 
       <div id="approve" hidden>

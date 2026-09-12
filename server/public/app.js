@@ -16,6 +16,9 @@ async function api(path, body, method=body===undefined?"GET":"POST", headers={})
 function busy(form, callback) {
   form.addEventListener("submit",async e=>{e.preventDefault();const button=form.querySelector("button[type=submit]");button.disabled=true;message("");try{await callback();}catch(e){message(e.message,true);}finally{button.disabled=false;}});
 }
+function showProfile() {
+  $("profile-form").hidden=false;$("handle").value=hints.handle||"";$("card-title").textContent="Claim your handle.";$("card-description").textContent="This is how friends will find and poke you.";$("handle").focus();
+}
 async function refresh() {
   const session=await api("/api/auth/get-session");
   $("loading").hidden=true;
@@ -23,7 +26,7 @@ async function refresh() {
   for(const id of ["profile-form","approve","connected"]) $(id).hidden=true;
   if(!session){$("card-title").textContent="Come say hey.";$("card-description").textContent="Sign in or create an account. No password required.";return;}
   state=await api("/api/state");
-  if(!state.me.handle){$("profile-form").hidden=false;$("handle").value=hints.handle||"";$("card-title").textContent="Claim your corner.";return;}
+  if(!state.me.handle){showProfile();return;}
   $("identity").textContent=`Hey, @${state.me.handle}.`;
   if(userCode){
     const device=await api(`/api/auth/device?user_code=${encodeURIComponent(userCode)}`);
