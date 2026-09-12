@@ -6,7 +6,12 @@ if (fragment.has("email")) sessionStorage.setItem("pokachy-hints", JSON.stringif
 history.replaceState(null, "", location.pathname + location.search);
 let hints = {};
 try { hints = JSON.parse(sessionStorage.getItem("pokachy-hints") || "{}"); } catch { /* Optional hints only. */ }
-function message(text, bad=false) { $("notice").textContent=text; $("notice").className=bad?"error":""; }
+function message(text, bad=false) {
+  const notice=$("notice");notice.replaceChildren();notice.className=bad?"error":"";notice.setAttribute("role",bad?"alert":"status");notice.setAttribute("aria-live",bad?"assertive":"polite");
+  if(!text) return;
+  const mark=document.createElement("span");mark.className="notice-mark";mark.setAttribute("aria-hidden","true");mark.textContent=bad?"!":"✳";
+  const copy=document.createElement("span");copy.textContent=text;notice.append(mark,copy);
+}
 async function api(path, body, method=body===undefined?"GET":"POST", headers={}) {
   const response=await fetch(path,{method,headers:{"Content-Type":"application/json",...headers},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await response.json();
@@ -21,6 +26,14 @@ function showProfile() {
 }
 function showApproval(code) {
   $("approve").hidden=false;$("device-code").textContent=code;$("card-title").textContent="Connect this desktop.";$("card-description").textContent="Compare this code with the one shown in your terminal.";
+}
+function showFatal(error) {
+  const unavailable=!!userCode&&error.message.startsWith("This device request is unavailable.");
+  $("loading").hidden=true;for(const id of ["auth","profile-form","approve","connected"]) $(id).hidden=true;$("signout").hidden=true;$("fatal-actions").hidden=false;
+  $("card-title").textContent=unavailable?"Code no longer available.":"We lost the signal.";
+  $("card-description").textContent=unavailable?"This code may have expired or already been used.":"Pokachy couldn’t connect. Check your connection and try again.";
+  $("recovery-label").textContent=unavailable?"Back to my account":"Try again";$("recovery-icon").textContent=unavailable?"←":"↻";$("recovery-button").dataset.action=unavailable?"account":"reload";
+  message(unavailable?"Run pokachy init again to create a new code.":error.message,true);
 }
 async function refresh() {
   const session=await api("/api/auth/get-session");
@@ -55,8 +68,9 @@ $("github").onclick=()=>github();$("link-github").onclick=()=>github(true);
 $("signout").onclick=async()=>{try{await api("/api/auth/sign-out",{});location.assign("/account");}catch(e){message(e.message,true);}};
 $("approve-button").onclick=async()=>{try{$("approve-button").disabled=true;await api("/api/auth/device/approve",{userCode});$("approve").hidden=true;$("connected").hidden=false;$("card-title").textContent="See you on your desktop.";$("card-description").textContent="Your terminal is ready. You can close this tab.";message("Device connected. You can return to your terminal.");sessionStorage.removeItem("pokachy-hints");}catch(e){message(e.message,true);}finally{$("approve-button").disabled=false;}};
 $("deny-button").onclick=async()=>{try{await api("/api/auth/device/deny",{userCode});$("approve").hidden=true;$("card-title").textContent="Request denied.";$("card-description").textContent="Nothing was connected. You can close this tab.";message("");}catch(e){message(e.message,true);}};
+$("recovery-button").onclick=()=>{$("recovery-button").dataset.action==="account"?location.assign("/account"):location.reload();};
 $("sessions-toggle").onclick=async()=>{try{const sessions=await api("/api/auth/list-sessions");$("sessions").replaceChildren();$("sessions").hidden=false;for(const s of sessions){const row=document.createElement("div");row.className="session";const label=document.createElement("span");label.textContent=s.userAgent||"Pokachy device";const revoke=document.createElement("button");revoke.className="text-button";revoke.textContent="Revoke";revoke.onclick=async()=>{try{await api("/api/auth/revoke-session",{token:s.token});row.remove();await refresh();}catch(e){message(e.message,true);}};row.append(label,revoke);$("sessions").append(row);}}catch(e){message(e.message,true);}};
 (async()=>{try{config=await api("/api/config");$("github").hidden=!config.github;$("divider").hidden=!config.github;$("local").hidden=!config.local;$("email").value=hints.email||"";
   if(config.turnstileSiteKey){window.onPokachyTurnstile=()=>{widget=window.turnstile.render("#turnstile-container",{sitekey:config.turnstileSiteKey,action:"login",theme:"dark",callback:token=>{turnstileToken=token;},"expired-callback":()=>{turnstileToken="";},"error-callback":()=>{turnstileToken="";message("Verification failed. Please reload.",true);}});};const script=document.createElement("script");script.src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onPokachyTurnstile&render=explicit";script.async=true;document.head.append(script);}
   await refresh();
-}catch(e){$("loading").hidden=true;message(e.message,true);}})();
+}catch(e){showFatal(e);}})();

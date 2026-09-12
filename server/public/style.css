@@ -143,8 +143,11 @@ input::placeholder { color: #6f776c; }
 .local button { display: block; }
 .session { padding: 11px 0; overflow-wrap: anywhere; border-top: 1px solid var(--line); font-size: 12px; }
 .session button { float: right; }
-#notice { margin: 15px 0 0; color: var(--signal); font-size: 13px; overflow-wrap: anywhere; }
-#notice.error { color: var(--danger); }
+#notice:not(:empty) { display: flex; gap: 10px; align-items: flex-start; margin: 15px 0 0; padding: 12px 13px; overflow-wrap: anywhere; border: 1px solid #4d5a43; border-left: 3px solid var(--signal); border-radius: 4px; background: var(--signal-soft); color: #daddd3; font-size: 13px; line-height: 1.5; }
+#notice.error { border-color: #70483f; border-left-color: var(--reply); background: rgba(255,142,114,.07); }
+.notice-mark { flex: 0 0 auto; color: var(--signal); font: 700 14px/1.4 var(--mono); }
+#notice.error .notice-mark { color: var(--reply); }
+#fatal-actions { margin-top: -12px; }
 .card-foot { display: flex; justify-content: space-between; margin: 28px -34px -24px; padding: 14px 34px; border-top: 1px solid var(--line); color: var(--faint); font-size: 12px; }
 
 footer { border-top: 1px solid var(--line); color: var(--faint); font: 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
