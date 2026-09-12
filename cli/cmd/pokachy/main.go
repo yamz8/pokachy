@@ -45,6 +45,7 @@ type Poke struct {
 	Handle    string `json:"handle"`
 	Name      string `json:"name"`
 	CreatedAt int64  `json:"created_at"`
+	Outgoing  int    `json:"outgoing"`
 }
 type Me struct {
 	ID     string `json:"id"`
