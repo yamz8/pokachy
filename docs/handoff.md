@@ -124,4 +124,7 @@ Continue from this system rather than introducing a separate style. Useful next 
 - **Signed out:** Reframed the account card around one immediate task with the heading “Come say hey,” explicit sign-in-or-account-creation language, a clearer email-code action, accurate email privacy copy, and a concise automatic-account note. Improved the field and supporting-copy sizing without changing authentication behavior.
 - Validated the signed-out state in desktop and 390 × 844 browser layouts. The email field and primary action remain visible in the first mobile viewport, semantic labels are exposed correctly, and no browser warnings or errors appeared.
 - A fresh `npm run verify` passed all seven stages; report started `2026-09-12T14:39:00.955649+00:00`.
-- Email-code, handle-creation, device-approval, error, and connected/session states remain separate approval steps.
+- **Email code:** Added a dedicated “Check your inbox” state that identifies the destination address, presents the six-digit input with stronger numeric spacing, labels the primary action as verification, explains the actual five-minute expiry, and provides a centered route back to email entry. Changing the email clears the code and restores the signed-out copy while retaining the address for correction.
+- Validated the email-to-code transition and return path in desktop and 390 × 844 browser layouts. The code receives focus, every action stays visible in the first mobile viewport, semantic labels are exposed correctly, and no browser warnings or errors appeared.
+- A fresh `npm run verify` passed all seven stages; report started `2026-09-12T15:44:07.245530+00:00`.
+- Handle-creation, device-approval, error, and connected/session states remain separate approval steps.

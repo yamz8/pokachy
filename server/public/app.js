@@ -35,12 +35,14 @@ async function refresh() {
 busy($("email-form"),async()=>{
   if(!config.local&&!turnstileToken) throw new Error("Complete the verification first.");
   try{await api("/api/auth/email-otp/send-verification-otp",{email:$("email").value,type:"sign-in"},"POST",{"X-Turnstile-Token":turnstileToken});
-    $("email-form").hidden=true;$("code-form").hidden=false;$("local-code").hidden=!config.local;$("code").focus();message("Check your inbox for a six-digit code.");
+    $("email-form").hidden=true;$("code-form").hidden=false;$("local-code").hidden=!config.local;
+    $("card-title").textContent="Check your inbox.";$("card-description").textContent=`We sent a six-digit code to ${$("email").value}.`;
+    $("auth-help-text").textContent="The code expires in 5 minutes. Check spam if it doesn’t arrive.";$("code").focus();message("");
   }finally{if(widget!==undefined){window.turnstile.reset(widget);turnstileToken="";}}
 });
 busy($("code-form"),async()=>{await api("/api/auth/sign-in/email-otp",{email:$("email").value,otp:$("code").value,name:hints.name||$("email").value.split("@")[0]});$("local-code").hidden=true;message("");await refresh();});
 busy($("profile-form"),async()=>{await api("/api/profile",{handle:$("handle").value},"PUT");await refresh();});
-$("change-email").onclick=()=>{$("email-form").hidden=false;$("code-form").hidden=true;$("local-code").hidden=true;message("");};
+$("change-email").onclick=()=>{$("email-form").hidden=false;$("code-form").hidden=true;$("local-code").hidden=true;$("code").value="";$("card-title").textContent="Come say hey.";$("card-description").textContent="Sign in or create an account. No password required.";$("auth-help-text").textContent="New here? Signing in creates your account automatically.";message("");$("email").focus();};
 $("local-code").onclick=async()=>{try{const d=await api(`/api/dev/mail?email=${encodeURIComponent($("email").value)}`);$("code").value=d.otp||"";}catch(e){message(e.message,true);}};
 async function github(link=false){try{const result=await api(link?"/api/auth/link-social":"/api/auth/sign-in/social",{provider:"github",callbackURL:location.origin+location.pathname+location.search});if(result.url) location.assign(result.url);}catch(e){message(e.message,true);}}
 $("github").onclick=()=>github();$("link-github").onclick=()=>github(true);
