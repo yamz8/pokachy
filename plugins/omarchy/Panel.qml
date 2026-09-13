@@ -44,6 +44,13 @@ Panel {
   property bool historyAnchorPending: false
   property var retryArgs: []
   property var pendingPokes: ({})
+  property double labelNow: Date.now()
+  Timer {
+    interval: 60000
+    running: true
+    repeat: true
+    onTriggered: root.labelNow = Date.now()
+  }
   readonly property bool actionRunning: actionProc.running
   readonly property bool needsLogin: pokachyState && pokachyState.needsLogin === true
   readonly property bool online: pokachyState && pokachyState.online === true
@@ -262,6 +269,33 @@ Panel {
     var source = String(person && (person.handle || person.name) || "?").trim().replace(/^@/, "")
     return source === "" ? "?" : source.charAt(0).toUpperCase()
   }
+  // State history is capped globally; never infer an event from waiting/presence.
+  function latestKnownPoke(person) {
+    var events = list("history").concat(list("inbox"), olderHistory)
+    var latest = 0
+    for (var i = 0; i < events.length; i++) {
+      var time = Number(events[i].created_at)
+      if (handle(events[i]) === handle(person) && isFinite(time) && time > 0 && time <= labelNow && isFinite(new Date(time).getTime()))
+        latest = Math.max(latest, time)
+    }
+    return latest
+  }
+  function relativePokeTime(time, now) {
+    if (!isFinite(time) || time <= 0 || time > now || !isFinite(new Date(time).getTime()))
+      return ""
+    var minutes = Math.floor((now - time) / 60000)
+    if (minutes < 1) return "Now"
+    if (minutes < 60) return minutes + "m"
+    var date = new Date(time)
+    var today = new Date(now)
+    if (date.toDateString() === today.toDateString()) return Math.floor(minutes / 60) + "h"
+    today.setDate(today.getDate() - 1)
+    if (date.toDateString() === today.toDateString()) return "Yesterday"
+    return Qt.formatDateTime(date, date.getFullYear() === new Date(now).getFullYear() ? "MMM d" : "MMM d, yyyy")
+  }
+  function pokeTimeTooltip(time) {
+    return "Latest known poke · " + Qt.formatDateTime(new Date(time), "MMM d, yyyy HH:mm:ss t") + " · either direction; cached history may be incomplete"
+  }
   function formatPokeTime(value) {
     var milliseconds = Number(value)
     if (!isFinite(milliseconds) || milliseconds <= 0)
@@ -326,6 +360,7 @@ Panel {
     try {
       var next = JSON.parse(String(line))
       if (next && typeof next === "object" && (next.needsLogin !== undefined || (next.me && typeof next.me === "object"))) {
+        labelNow = Date.now()
         pokachyState = next
         stateLoaded = true
         var pending = Object.assign({}, pendingPokes)
@@ -541,7 +576,7 @@ Panel {
     }
   }
 
-  KeyboardPanel {
+  SquareKeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
     owner: root.barIdentity
@@ -584,7 +619,7 @@ Panel {
           spacing: Style.space(12)
 
           PanelHero {
-            visible: root.needsLogin || !root.activeFriend
+            visible: root.needsLogin
             width: parent.width
             foreground: root.foreground
             fontFamily: root.fontFamily
@@ -610,6 +645,71 @@ Panel {
               }
             }
             trailingControl: root.needsLogin ? null : accountActions
+          }
+
+          Item {
+            visible: !root.needsLogin && !root.activeFriend
+            width: parent.width
+            height: Style.space(44)
+            AvatarButton {
+              id: ownerAvatar
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              label: root.avatarInitial(root.pokachyState.me)
+              image: String(root.pokachyState.me && root.pokachyState.me.image || "")
+              size: Style.space(36)
+              Rectangle {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                width: Style.space(10)
+                height: width
+                radius: width / 2
+                color: root.online ? "#75b56b" : Color.muted
+                border.width: Style.space(2)
+                border.color: Color.popups.background
+                Accessible.role: Accessible.StaticText
+                Accessible.name: root.online ? "Connected to Pokachy" : "Offline · cached activity"
+                MouseArea { id: connectionMouse; anchors.fill: parent; hoverEnabled: true }
+                PanelToolTip {
+                  visible: connectionMouse.containsMouse
+                  text: root.online ? "Connected to Pokachy" : "Offline · cached activity"
+                  fontFamily: root.fontFamily
+                }
+              }
+            }
+            Column {
+              anchors.left: ownerAvatar.right
+              anchors.leftMargin: Style.space(12)
+              anchors.right: quietControl.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(2)
+              Text {
+                width: parent.width
+                text: root.displayName(root.pokachyState.me)
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.bold: true
+              }
+              Text {
+                width: parent.width
+                text: root.handle(root.pokachyState.me) ? "@" + root.handle(root.pokachyState.me) : ""
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: root.secondaryForeground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+            }
+            Loader {
+              id: quietControl
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              sourceComponent: accountActions
+            }
           }
 
           Component {
@@ -697,7 +797,12 @@ Panel {
             TextField {
               id: friendSearch
               width: parent.width
-              placeholderText: "Find or add @handle"
+              placeholderText: "Search"
+              background: BorderSurface {
+                radius: 0
+                color: Style.controlFill(friendSearch.activeFocus, friendSearch.hovered, root.foreground, Color.accent)
+                borderSpec: Border.controlSpec(friendSearch.activeFocus ? "focus" : (friendSearch.hovered ? "hover-cursor" : "normal"), root.foreground, Color.accent)
+              }
               activeFocusOnTab: true
               Accessible.name: "Find a contact or add a handle"
               onAccepted: root.submitFriendSearch()
@@ -1044,24 +1149,17 @@ Panel {
               }
             }
 
-            PanelActionButton {
+            PokeButton {
               id: conversationPoke
+              fontFamily: root.fontFamily
+              foreground: root.activeIncomingPoke ? Color.accent : root.foreground
               width: parent.width
               height: Style.space(38)
-              tooltipText: root.activeSendingPoke ? "Sending poke…" : (root.activeWaitingForReply ? "Poke sent · waiting for a poke back" : (root.activeIncomingPoke ? "Poke back @" : "Poke @") + root.handle(root.activeFriend))
-              foreground: root.activeIncomingPoke ? (root.bar ? root.bar.urgent : Color.urgent) : root.foreground
-              fontFamily: root.fontFamily
-              focusable: true
-              bordered: true
-              enabled: !root.activeWaitingForReply && !root.actionRunning
-              Accessible.name: tooltipText
-              BrandIcon {
-                anchors.centerIn: parent
-                width: Style.space(32)
-                height: width
-                foreground: parent.foreground
-                opacity: parent.enabled ? 1 : 0.4
-              }
+              sending: root.activeSendingPoke
+              incoming: !!root.activeIncomingPoke
+              waiting: root.activeWaitingForReply
+              busy: root.actionRunning
+              contactHandle: root.handle(root.activeFriend)
               onClicked: root.runAction("Sending poke…", ["poke", "@" + root.handle(root.activeFriend)])
             }
           }
@@ -1090,7 +1188,7 @@ Panel {
         anchors.rightMargin: Style.space(8)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        radius: Style.cornerRadius
+        radius: 0
         activeFocusOnTab: true
         onActiveFocusChanged: if (activeFocus)
           root.ensureListItemVisible(friendItem)
@@ -1132,12 +1230,11 @@ Panel {
             font.pixelSize: Style.font.body
           }
           Text {
-            visible: friendItem.hasIncoming || friendItem.waitingForReply || friendItem.sendingPoke
             width: parent.width
-            text: friendItem.sendingPoke ? "sending…" : (friendItem.hasIncoming ? "poked you" : "waiting for poke back")
+            text: "@" + friendItem.friendHandle
             textFormat: Text.PlainText
             elide: Text.ElideRight
-            color: friendItem.hasIncoming ? (root.bar ? root.bar.urgent : Color.urgent) : Qt.darker(root.foreground, 1.45)
+            color: root.secondaryForeground
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
           }
@@ -1159,24 +1256,34 @@ Panel {
         id: rowActions
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        PanelActionButton {
-          size: Style.space(38)
-          tooltipText: friendItem.sendingPoke ? "Sending poke…" : (friendItem.waitingForReply ? "Poke sent · waiting for a poke back" : (friendItem.hasIncoming ? "Poke @" + friendItem.friendHandle + " back" : "Poke @" + friendItem.friendHandle))
-          foreground: friendItem.hasIncoming ? (root.bar ? root.bar.urgent : Color.urgent) : root.foreground
+        spacing: Style.space(4)
+        readonly property double latest: root.latestKnownPoke(friendItem.modelData)
+        Text {
+          anchors.verticalCenter: parent.verticalCenter
+          visible: rowActions.latest > 0
+          text: root.relativePokeTime(rowActions.latest, root.labelNow)
+          color: root.secondaryForeground
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          Accessible.name: root.pokeTimeTooltip(rowActions.latest)
+          MouseArea { id: timeMouse; anchors.fill: parent; hoverEnabled: true }
+          PanelToolTip {
+            visible: timeMouse.containsMouse
+            text: root.pokeTimeTooltip(rowActions.latest)
+            fontFamily: root.fontFamily
+          }
+        }
+        PokeButton {
+          size: Style.space(36)
           fontFamily: root.fontFamily
-          focusable: true
-          bordered: true
-          enabled: !friendItem.waitingForReply && !root.actionRunning
-          Accessible.name: tooltipText
+          foreground: friendItem.hasIncoming ? Color.accent : root.foreground
+          sending: friendItem.sendingPoke
+          incoming: friendItem.hasIncoming
+          waiting: friendItem.waitingForReply
+          busy: root.actionRunning
+          contactHandle: friendItem.friendHandle
           onActiveFocusChanged: if (activeFocus)
             root.ensureListItemVisible(friendItem)
-          BrandIcon {
-            anchors.centerIn: parent
-            width: Style.space(32)
-            height: width
-            foreground: parent.foreground
-            opacity: parent.enabled ? 1 : 0.4
-          }
           onClicked: root.runAction("Sending poke…", ["poke", "@" + friendItem.friendHandle])
         }
       }
