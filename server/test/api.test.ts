@@ -72,6 +72,33 @@ test("administrators can review reports and suspend another user",async()=>{
   expect((await request("/api/state",reported.token)).status).toBe(401);
 });
 
+test("history is friend-scoped and cursor-paginated",async()=>{
+  const a=await user("historyalice"), b=await user("historybobby"), outsider=await user("historyoutsider");
+  expect((await request("/api/friends/historybobby",a.token,"POST",{})).status).toBe(200);
+  expect((await request("/api/friends/historyalice/accept",b.token,"POST",{})).status).toBe(200);
+  for(let i=0;i<52;i++) {
+    await env.DB.prepare("INSERT INTO pokes(id,sender,recipient,created_at,resolved_at,request_key) VALUES (?,?,?,?,?,?)")
+      .bind(crypto.randomUUID(), i%2 ? b.user.id : a.user.id, i%2 ? a.user.id : b.user.id, 2_000_000+Math.floor(i/3), 2_000_001+i, crypto.randomUUID()).run();
+  }
+  const first=await request("/api/history/historybobby",a.token);
+  expect(first.status).toBe(200);
+  const page=await first.json() as {history: {id:string;handle:string;created_at:number;outgoing:number}[];next_cursor:string|null};
+  expect(page.history).toHaveLength(50); expect(page.next_cursor).toEqual(expect.any(String));
+  const second=await request(`/api/history/historybobby?before=${encodeURIComponent(page.next_cursor!)}`,a.token);
+  expect(second.status).toBe(200);
+  const older=await second.json() as typeof page;
+  expect(older.history).toHaveLength(2); expect(older.next_cursor).toBeNull();
+  const all=page.history.concat(older.history);
+  expect(new Set(all.map(p=>p.id)).size).toBe(52);
+  expect(all.every(p=>p.handle==="historybobby")).toBe(true);
+  expect(all.filter(p=>p.outgoing===1)).toHaveLength(26);
+  expect(all.map(p=>p.created_at)).toEqual(all.map(p=>p.created_at).sort((a,b)=>b-a));
+  expect((await request("/api/history/historybobby?before=bad",a.token)).status).toBe(400);
+  expect((await request("/api/history/historybobby",outsider.token)).status).toBe(404);
+  expect((await request("/api/history/historybobby")).status).toBe(401);
+  expect((await request("/api/history/historybobby?before="+"x".repeat(257),a.token)).status).toBe(400);
+});
+
 test("device onboarding requires explicit approval and a one-time redemption",async()=>{
   const u=await user("deviceuser");
   const started=await request("/api/auth/device/code",undefined,"POST",{client_id:"pokachy-cli"});

@@ -1,6 +1,6 @@
 # Pokachy
 
-A little nudge for your Linux friends. Poke from your terminal or Omarchy bar and receive desktop notifications.
+A tiny way to say hey to your Linux friends. Poke from your terminal or Omarchy bar and receive desktop notifications.
 
 **[pokachy.com](https://pokachy.com)** · **[Download](https://github.com/yamz8/pokachy/releases/latest)** · **[Omarchy panel](docs/omarchy.md)**
 

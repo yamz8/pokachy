@@ -45,6 +45,7 @@ type Poke struct {
 	Handle    string `json:"handle"`
 	Name      string `json:"name"`
 	CreatedAt int64  `json:"created_at"`
+	Outgoing  int    `json:"outgoing"`
 }
 type Me struct {
 	ID     string `json:"id"`
@@ -64,6 +65,10 @@ type State struct {
 	Online     bool     `json:"online"`
 	SyncedAt   int64    `json:"synced_at"`
 	NeedsLogin bool     `json:"needsLogin"`
+}
+type HistoryPage struct {
+	History    []Poke  `json:"history"`
+	NextCursor *string `json:"next_cursor"`
 }
 type Client struct {
 	Config Config
@@ -196,7 +201,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 		return errors.New("invalid API path")
 	}
 	relative, err := url.Parse(path)
-	if err != nil || relative.IsAbs() || relative.Host != "" || relative.RawQuery != "" || relative.Fragment != "" {
+	if err != nil || relative.IsAbs() || relative.Host != "" || relative.Fragment != "" {
 		return errors.New("invalid API path")
 	}
 	var reader io.Reader
@@ -208,7 +213,7 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 		reader = strings.NewReader(string(data))
 	}
 	target := base.ResolveReference(relative)
-	// ResolveReference intentionally receives no query or fragment from callers.
+	// Query values are encoded by callers; absolute origins and fragments are rejected.
 	req, err := http.NewRequestWithContext(ctx, method, target.String(), reader)
 	if err != nil {
 		return err
@@ -286,6 +291,41 @@ func requestKey() string { b := make([]byte, 16); _, _ = rand.Read(b); return he
 func (c *Client) poke(ctx context.Context, handle string) error {
 	return c.request(ctx, "POST", "/api/pokes/"+url.PathEscape(strings.TrimPrefix(handle, "@")), map[string]any{}, nil, requestKey())
 }
+func (c *Client) history(ctx context.Context, handle, before string) (HistoryPage, error) {
+	path := "/api/history/" + url.PathEscape(strings.TrimPrefix(handle, "@"))
+	if before != "" {
+		path += "?" + url.Values{"before": {before}}.Encode()
+	}
+	var page HistoryPage
+	if err := c.request(ctx, "GET", path, nil, &page, ""); err != nil {
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound && apiErr.Message == "Not found" {
+			return page, errors.New("Older history needs a server update. Recent cached pokes are still shown.")
+		}
+		return page, err
+	}
+	return page, nil
+}
+
+func notificationIcon() string {
+	if executable, err := os.Executable(); err == nil {
+		icon := filepath.Join(filepath.Dir(executable), "..", "share", "icons", "hicolor", "scalable", "apps", "pokachy.svg")
+		if info, err := os.Stat(icon); err == nil && info.Mode().IsRegular() {
+			return icon
+		}
+	}
+	dataHome := os.Getenv("XDG_DATA_HOME")
+	if dataHome == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			dataHome = filepath.Join(home, ".local", "share")
+		}
+	}
+	icon := filepath.Join(dataHome, "icons", "hicolor", "scalable", "apps", "pokachy.svg")
+	if info, err := os.Stat(icon); err == nil && info.Mode().IsRegular() {
+		return icon
+	}
+	return "mail-unread"
+}
 
 func clearLocalSession(dir string) error {
 	for _, name := range []string{"credentials.json", "state.json", "notified.json"} {
@@ -304,6 +344,7 @@ func help() {
   pokachy poke @friend
   pokachy friends [add|accept|remove] @friend
   pokachy inbox
+  pokachy history @friend [--before CURSOR] [--json]
   pokachy dismiss POKE_ID
   pokachy quiet on|off
   pokachy block @person | unblock @person
@@ -428,6 +469,40 @@ func run(args []string) error {
 			}
 			if len(s.Inbox) == 0 {
 				fmt.Println("All caught up. A little nudge will find you here.")
+			}
+		}
+		return nil
+	case "history":
+		if err = need(2); err != nil {
+			return err
+		}
+		before := ""
+		for i := 2; i < len(args); i++ {
+			if args[i] == "--before" && i+1 < len(args) {
+				before = args[i+1]
+				i++
+			} else if strings.HasPrefix(args[i], "--before=") {
+				before = strings.TrimPrefix(args[i], "--before=")
+			} else {
+				return errors.New("use history @friend [--before CURSOR]")
+			}
+		}
+		page, e := c.history(ctx, args[1], before)
+		if e != nil {
+			return e
+		}
+		if asJSON {
+			outputJSON(page)
+		} else {
+			for _, p := range page.History {
+				verb := "poked you"
+				if p.Outgoing == 1 {
+					verb = "You poked"
+				}
+				fmt.Printf("%s · %s\n", verb, time.UnixMilli(p.CreatedAt).Local().Format("Jan 2 15:04"))
+			}
+			if page.NextCursor != nil {
+				fmt.Printf("Older history: pokachy history %s --before %s\n", safe(args[1]), safe(*page.NextCursor))
 			}
 		}
 		return nil
@@ -788,7 +863,7 @@ func (c *Client) notify(ctx context.Context, p Poke) {
 		if title == "" {
 			title = "@" + safe(p.Handle)
 		}
-		cmd := exec.CommandContext(notifyCtx, "notify-send", "--app-name=Pokachy", "--icon=mail-unread", "--expire-time=12000", "--wait", "--action=poke=Poke back", "--", html.EscapeString(title)+" poked you", "A little nudge from @"+html.EscapeString(safe(p.Handle)))
+		cmd := exec.CommandContext(notifyCtx, "notify-send", "--app-name=Pokachy", "--icon="+notificationIcon(), "--expire-time=12000", "--wait", "--action=poke=Poke back", "--", html.EscapeString(title)+" poked you", "A little nudge from @"+html.EscapeString(safe(p.Handle)))
 		out, err := cmd.Output()
 		if err != nil {
 			if notifyCtx.Err() == nil {

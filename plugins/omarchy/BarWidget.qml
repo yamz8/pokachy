@@ -13,17 +13,30 @@ BarWidget {
 
   function injectPanel() {
     var target = panelLoader.item
-    if (!target) return
+    if (!target)
+      return
     target.bar = root.bar
     target.settings = root.settings
     target.anchorItem = button
     target.hostWidget = root
   }
 
-  function open() { if (panelLoader.item) panelLoader.item.open() }
-  function close() { if (panelLoader.item) panelLoader.item.close() }
-  function closeForPopoutSwitch() { if (panelLoader.item) panelLoader.item.closeForPopoutSwitch() }
-  function refresh() { if (panelLoader.item) panelLoader.item.refresh() }
+  function open() {
+    if (panelLoader.item)
+      panelLoader.item.open()
+  }
+  function close() {
+    if (panelLoader.item)
+      panelLoader.item.close()
+  }
+  function closeForPopoutSwitch() {
+    if (panelLoader.item)
+      panelLoader.item.closeForPopoutSwitch()
+  }
+  function refresh() {
+    if (panelLoader.item)
+      panelLoader.item.refresh()
+  }
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
@@ -35,7 +48,10 @@ BarWidget {
     active: true
     source: Qt.resolvedUrl("Panel.qml")
     visible: false
-    onLoaded: { root.injectPanel(); Qt.callLater(root.injectPanel) }
+    onLoaded: {
+      root.injectPanel()
+      Qt.callLater(root.injectPanel)
+    }
   }
 
   BarIconButton {
@@ -43,13 +59,26 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     slotSize: Style.bar.statusSlot
-    text: panelLoader.item && panelLoader.item.needsLogin ? "󰍹"
-      : (panelLoader.item && panelLoader.item.inboxCount > 0 ? "󰍴" : "󰍳")
+    iconComponent: Component {
+      Item {
+        readonly property real iconSize: Math.round(Math.min(width, height) * 0.75)
+
+        BrandIcon {
+          anchors.centerIn: parent
+          width: parent.iconSize
+          height: parent.iconSize
+          foreground: button.active && button.useActiveColor ? button.activeColor : button.foreground
+          opacity: panelLoader.item && panelLoader.item.needsLogin ? 0.55 : 1.0
+        }
+      }
+    }
     active: panelLoader.item && panelLoader.item.inboxCount > 0
     tooltipText: panelLoader.item ? panelLoader.item.barTooltip : "Pokachy"
-    onPressed: function(mouseButton) {
-      if (mouseButton === Qt.MiddleButton) root.refresh()
-      else if (panelLoader.item) panelLoader.item.toggle()
+    onPressed: function (mouseButton) {
+      if (mouseButton === Qt.MiddleButton)
+        root.refresh()
+      else if (panelLoader.item)
+        panelLoader.item.toggle()
     }
   }
 }

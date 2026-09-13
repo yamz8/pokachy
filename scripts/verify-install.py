@@ -108,6 +108,7 @@ def verify_install(extracted: Path, prefix: Path, config: Path, package_version:
     binary = prefix / "bin/pokachy"
     service = config / "systemd/user/pokachy.service"
     check(binary.is_file() and os.access(binary, os.X_OK), "installed CLI is executable")
+    check((prefix / "share/icons/hicolor/scalable/apps/pokachy.svg").is_file(), "installed parrot notification icon")
     result = run([str(binary), "version"], "installed CLI version", cwd=extracted, env=env, timeout=10)
     check(result.stdout.strip() == package_version, "installed CLI matches package version")
     lines = service.read_text().splitlines()
@@ -145,7 +146,8 @@ def main() -> int:
                 check(sums.get(archive.name) == actual, "SHA256SUMS " + archive.name)
             required = ["bin/pokachy", "scripts/install.sh", "packaging/systemd/pokachy.service",
                         "manifest.json", "README.md", "LICENSE", "plugins/omarchy/BarWidget.qml",
-                        "plugins/omarchy/Panel.qml"]
+                        "plugins/omarchy/Panel.qml", "plugins/omarchy/BrandIcon.qml",
+                        "assets/brand/pokachy-parrot.svg", "assets/brand/pokachy-symbol.svg"]
             roots: dict[str, Path] = {}
             for archive in archives:
                 extracted = Path(work) / archive.stem.removesuffix(".tar")

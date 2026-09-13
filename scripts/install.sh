@@ -41,6 +41,10 @@ fi
 
 mkdir -p "$install_prefix/bin" "$config_root/systemd/user"
 install -m 0755 "$binary" "$install_prefix/bin/pokachy"
+if [ -f "$root_dir/assets/brand/pokachy-parrot.svg" ]; then
+  mkdir -p "$install_prefix/share/icons/hicolor/scalable/apps"
+  install -m 0644 "$root_dir/assets/brand/pokachy-parrot.svg" "$install_prefix/share/icons/hicolor/scalable/apps/pokachy.svg"
+fi
 
 # ExecStart is parsed by systemd, not a shell. Quote spaces and escape the
 # characters systemd treats specially while retaining a literal absolute path.

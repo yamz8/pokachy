@@ -4,7 +4,7 @@
   "name": "Pokachy",
   "version": "0.1.3",
   "author": "Pokachy",
-  "description": "A little nudge for your Linux friends. Requires the pokachy CLI.",
+  "description": "A tiny way to say hey to your Linux friends. Requires the pokachy CLI.",
   "kinds": ["bar-widget"],
   "entryPoints": {"barWidget": "plugins/omarchy/BarWidget.qml"},
   "barWidget": {

@@ -42,6 +42,8 @@ for arch in amd64 arm64; do
   cp "$root_dir/manifest.json" "$stage/manifest.json"
   cp "$root_dir/LICENSE" "$root_dir/README.md" "$stage/"
   cp -R "$root_dir/plugins/omarchy" "$stage/plugins/omarchy"
+  mkdir -p "$stage/assets"
+  cp -R "$root_dir/assets/brand" "$stage/assets/brand"
   tar -C "$work_dir" -czf "$dist_dir/$name.tar.gz" "$name"
 done
 
