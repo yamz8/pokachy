@@ -186,10 +186,8 @@ Panel {
     }
 
     PanelToolTip {
-      objectName: "avatarFocusHint"
-      visible: avatar.tooltipText !== "" && (avatarMouse.containsMouse || (avatar.interactive && avatar.activeFocus))
-      delay: avatar.activeFocus ? 0 : 400
-      text: avatar.tooltipText + (avatar.interactive && avatar.activeFocus ? " · Enter to open history" : "")
+      visible: avatar.tooltipText !== "" && avatarMouse.containsMouse
+      text: avatar.tooltipText
       fontFamily: root.fontFamily
     }
   }
