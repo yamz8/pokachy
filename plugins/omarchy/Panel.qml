@@ -172,21 +172,24 @@ Panel {
 
     // Draw focus above the photo: the Image fills the avatar surface and
     // otherwise covers its native Rectangle border when loaded.
-    BorderSurface {
+    Rectangle {
       objectName: "avatarFocusRing"
       anchors.fill: parent
-      anchors.margins: -Style.space(2)
-      radius: avatar.radius + Style.space(2)
+      anchors.margins: -Style.space(3)
+      radius: avatar.radius + Style.space(3)
       z: 10
       visible: avatar.interactive && avatar.activeFocus
       color: "transparent"
-      borderSpec: Border.controlSpec("focus", avatar.foreground, avatar.foreground)
+      border.width: Math.max(2, Style.space(2))
+      border.color: avatar.foreground
       Accessible.ignored: true
     }
 
     PanelToolTip {
-      visible: avatar.tooltipText !== "" && avatarMouse.containsMouse
-      text: avatar.tooltipText
+      objectName: "avatarFocusHint"
+      visible: avatar.tooltipText !== "" && (avatarMouse.containsMouse || (avatar.interactive && avatar.activeFocus))
+      delay: avatar.activeFocus ? 0 : 400
+      text: avatar.tooltipText + (avatar.interactive && avatar.activeFocus ? " · Enter to open history" : "")
       fontFamily: root.fontFamily
     }
   }
