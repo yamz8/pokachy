@@ -22,7 +22,6 @@ Panel {
   readonly property string lastError: actionError !== "" ? actionError : statusError
   property string actionLabel: ""
   property string actionKey: ""
-  property bool addingFriend: false
   property string activeFriendHandle: ""
   readonly property bool actionRunning: actionProc.running
   readonly property bool needsLogin: pokachyState && pokachyState.needsLogin === true
@@ -116,6 +115,42 @@ Panel {
     }
     return null
   }
+  function normalizedSearch(value) {
+    return String(value || "").trim().toLowerCase().replace(/^@/, "")
+  }
+  function filteredFriends(value) {
+    var query = normalizedSearch(value)
+    var friends = list("friends")
+    if (query === "") return friends
+    var matches = []
+    for (var i = 0; i < friends.length; i++) {
+      var friendHandle = handle(friends[i]).toLowerCase()
+      var friendName = String(friends[i].name || "").toLowerCase()
+      if (friendHandle.indexOf(query) !== -1 || friendName.indexOf(query) !== -1) matches.push(friends[i])
+    }
+    return matches
+  }
+  function exactSearchFriend(value) {
+    var query = normalizedSearch(value)
+    return query === "" ? null : friendForHandle(query)
+  }
+  function canAddSearch(value) {
+    var query = normalizedSearch(value)
+    return /^[a-z0-9][a-z0-9_]{2,23}$/.test(query) && filteredFriends(value).length === 0
+  }
+  function submitFriendSearch() {
+    var exact = exactSearchFriend(friendSearch.text)
+    if (exact) {
+      openConversation(exact)
+      return
+    }
+    var matches = filteredFriends(friendSearch.text)
+    if (matches.length === 1) {
+      openConversation(matches[0])
+      return
+    }
+    if (canAddSearch(friendSearch.text)) addFriend(friendSearch.text)
+  }
   function inboxFor(person) {
     var friendHandle = handle(person)
     var inbox = list("inbox")
@@ -144,7 +179,7 @@ Panel {
   }
   function openConversation(person) {
     activeFriendHandle = handle(person)
-    addingFriend = false
+    friendSearch.text = ""
     panelScroll.contentY = 0
   }
   function closeConversation() {
@@ -178,12 +213,11 @@ Panel {
     actionProc.command = ["/usr/bin/env", "pokachy"].concat(args)
     actionProc.running = true
   }
-  function addFriend() {
-    var value = friendField.text.trim()
-    if (value === "") return
-    runAction("Adding friend…", ["friends", "add", value])
-    friendField.text = ""
-    addingFriend = false
+  function addFriend(value) {
+    var friendHandle = normalizedSearch(value)
+    if (!canAddSearch(friendHandle)) return
+    runAction("Adding friend…", ["friends", "add", "@" + friendHandle])
+    friendSearch.text = ""
   }
   function setup() {
     // This command is fully static. No state, token, or user supplied input
@@ -191,7 +225,7 @@ Panel {
     if (bar) bar.run("omarchy-launch-floating-terminal-with-presentation pokachy init")
   }
   function open() { refresh(); controller.show() }
-  function close() { closeConversation(); controller.hide() }
+  function close() { closeConversation(); friendSearch.text = ""; controller.hide() }
   function toggle() { opened ? close() : open() }
   function closeForPopoutSwitch() { root.popoutSwitchClosing = true; close(); Qt.callLater(function() { root.popoutSwitchClosing = false }) }
   function switchPanel(direction) {
@@ -309,31 +343,15 @@ Panel {
 
           Component {
             id: accountActions
-            Row {
-              spacing: Style.space(4)
-              PanelActionButton {
-                iconText: root.addingFriend ? "󰅖" : "󰐕"
-                tooltipText: root.addingFriend ? "Close add friend" : "Add friend"
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                size: Style.space(28)
-                focusable: true
-                Accessible.name: tooltipText
-                onClicked: {
-                  root.addingFriend = !root.addingFriend
-                  if (root.addingFriend) Qt.callLater(function() { friendField.forceActiveFocus() })
-                }
-              }
-              PanelActionButton {
-                iconText: root.pokachyState.me && root.pokachyState.me.quiet ? "󰂛" : "󰂚"
-                tooltipText: root.pokachyState.me && root.pokachyState.me.quiet ? "Resume notifications" : "Quiet notifications"
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                size: Style.space(28)
-                focusable: true
-                Accessible.name: tooltipText
-                onClicked: root.runAction("Updating quiet mode…", ["quiet", root.pokachyState.me && root.pokachyState.me.quiet ? "off" : "on"])
-              }
+            PanelActionButton {
+              iconText: root.pokachyState.me && root.pokachyState.me.quiet ? "󰂛" : "󰂚"
+              tooltipText: root.pokachyState.me && root.pokachyState.me.quiet ? "Resume notifications" : "Quiet notifications"
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              size: Style.space(28)
+              focusable: true
+              Accessible.name: tooltipText
+              onClicked: root.runAction("Updating quiet mode…", ["quiet", root.pokachyState.me && root.pokachyState.me.quiet ? "off" : "on"])
             }
           }
 
@@ -371,23 +389,43 @@ Panel {
             width: parent.width
             spacing: Style.space(8)
 
-            Row {
-              visible: root.addingFriend
+            TextField {
+              id: friendSearch
               width: parent.width
-              spacing: Style.space(8)
-              TextField { id: friendField; width: Math.max(Style.space(180), parent.width - addButton.implicitWidth - Style.space(8)); placeholderText: "Add @handle"; activeFocusOnTab: true; onAccepted: root.addFriend() }
-              Button { id: addButton; text: "Add"; focusable: true; onClicked: root.addFriend() }
+              placeholderText: "Find or add @handle"
+              activeFocusOnTab: true
+              onAccepted: root.submitFriendSearch()
             }
-            Repeater { model: root.list("friends"); delegate: friendRow }
-            Text { visible: root.list("friends").length === 0; text: "Add a friend to send your first poke."; color: Qt.darker(root.foreground, 1.45); font.family: root.fontFamily; font.pixelSize: Style.font.body }
+            Repeater { model: root.filteredFriends(friendSearch.text); delegate: friendRow }
+            Button {
+              visible: root.canAddSearch(friendSearch.text)
+              width: parent.width
+              text: "Add @" + root.normalizedSearch(friendSearch.text)
+              iconText: "󰐕"
+              leftAlign: true
+              focusable: true
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+              onClicked: root.addFriend(friendSearch.text)
+            }
+            Text {
+              visible: friendSearch.text.trim() !== "" && root.filteredFriends(friendSearch.text).length === 0 && !root.canAddSearch(friendSearch.text)
+              width: parent.width
+              text: "No matching contact"
+              horizontalAlignment: Text.AlignHCenter
+              color: Qt.darker(root.foreground, 1.45)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+            Text { visible: friendSearch.text.trim() === "" && root.list("friends").length === 0; text: "Search for a handle to add your first friend."; color: Qt.darker(root.foreground, 1.45); font.family: root.fontFamily; font.pixelSize: Style.font.body }
 
-            PanelSeparator { visible: root.list("requests").length > 0; foreground: root.foreground }
-            PanelSectionHeader { visible: root.list("requests").length > 0; text: "Requests"; foreground: root.foreground; fontFamily: root.fontFamily }
-            Repeater { model: root.list("requests"); delegate: requestRow }
+            PanelSeparator { visible: friendSearch.text.trim() === "" && root.list("requests").length > 0; foreground: root.foreground }
+            PanelSectionHeader { visible: friendSearch.text.trim() === "" && root.list("requests").length > 0; text: "Requests"; foreground: root.foreground; fontFamily: root.fontFamily }
+            Repeater { model: friendSearch.text.trim() === "" ? root.list("requests") : []; delegate: requestRow }
 
-            PanelSeparator { visible: root.list("blocked").length > 0; foreground: root.foreground }
-            PanelSectionHeader { visible: root.list("blocked").length > 0; text: "Blocked"; foreground: root.foreground; fontFamily: root.fontFamily }
-            Repeater { model: root.list("blocked"); delegate: blockedRow }
+            PanelSeparator { visible: friendSearch.text.trim() === "" && root.list("blocked").length > 0; foreground: root.foreground }
+            PanelSectionHeader { visible: friendSearch.text.trim() === "" && root.list("blocked").length > 0; text: "Blocked"; foreground: root.foreground; fontFamily: root.fontFamily }
+            Repeater { model: friendSearch.text.trim() === "" ? root.list("blocked") : []; delegate: blockedRow }
           }
 
           Column {
