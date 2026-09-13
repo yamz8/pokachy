@@ -13,6 +13,14 @@ const error = (c: Ctx, message: string, status: 400 | 401 | 403 | 404 | 409 | 42
 const uid = (c: Ctx) => c.get("identity").user.id;
 const pair = (a: string, b: string) => [a, b].sort();
 const sql = (c: Ctx, query: string, ...args: unknown[]) => c.env.DB.prepare(query).bind(...args);
+function githubAvatar(value: unknown) {
+  if (typeof value !== "string" || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    return url.origin === "https://avatars.githubusercontent.com" && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+const withAvatar = <T extends Record<string, unknown>>(row: T): T & { image: string | null } => ({ ...row, image: githubAvatar(row.image) });
 const historyPageSize = 50;
 type HistoryCursor = { createdAt: number; id: string };
 function encodeHistoryCursor(cursor: HistoryCursor) {
@@ -71,7 +79,7 @@ app.use("*", async (c, next) => {
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Referrer-Policy", "no-referrer");
   c.header("X-Frame-Options", "DENY");
-  c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  c.header("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: https://avatars.githubusercontent.com; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
   if (c.req.path.startsWith("/api/")) c.header("Cache-Control", "no-store");
   if (!isLocal(c.env)) c.header("Strict-Transport-Security", "max-age=31536000");
 });
@@ -150,20 +158,20 @@ app.get("/api/state", async c => {
   const id = uid(c);
   const results = await c.env.DB.batch<Record<string, unknown>>([
     sql(c, "SELECT handle,quiet FROM profiles WHERE user_id=?", id),
-    sql(c, `SELECT p.handle,u.name,f.accepted,f.requester=? AS outgoing,
+    sql(c, `SELECT p.handle,u.name,u.image,f.accepted,f.requester=? AS outgoing,
       EXISTS(SELECT 1 FROM pokes WHERE sender=? AND recipient=p.user_id AND resolved_at IS NULL) AS waiting
       FROM friendships f JOIN profiles p ON p.user_id=CASE WHEN f.a=? THEN f.b ELSE f.a END JOIN user u ON u.id=p.user_id
       WHERE (f.a=? OR f.b=?) AND p.suspended=0 ORDER BY f.accepted DESC,p.handle`, id,id,id,id,id),
-    sql(c, "SELECT k.id,p.handle,u.name,k.created_at FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN user u ON u.id=k.sender WHERE k.recipient=? AND k.resolved_at IS NULL AND p.suspended=0 ORDER BY k.created_at DESC LIMIT 100", id),
-    sql(c, "SELECT k.id,p.handle,k.created_at,k.sender=? AS outgoing,k.resolved_at FROM pokes k JOIN profiles p ON p.user_id=CASE WHEN k.sender=? THEN k.recipient ELSE k.sender END WHERE k.sender=? OR k.recipient=? ORDER BY k.created_at DESC LIMIT 50",id,id,id,id),
-    sql(c, "SELECT p.handle FROM blocks b JOIN profiles p ON p.user_id=b.blocked WHERE b.blocker=?", id),
+    sql(c, "SELECT k.id,p.handle,u.name,u.image,k.created_at FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN user u ON u.id=k.sender WHERE k.recipient=? AND k.resolved_at IS NULL AND p.suspended=0 ORDER BY k.created_at DESC LIMIT 100", id),
+    sql(c, "SELECT k.id,p.handle,u.name,u.image,k.created_at,k.sender=? AS outgoing,k.resolved_at FROM pokes k JOIN profiles p ON p.user_id=CASE WHEN k.sender=? THEN k.recipient ELSE k.sender END JOIN user u ON u.id=p.user_id WHERE k.sender=? OR k.recipient=? ORDER BY k.created_at DESC LIMIT 50",id,id,id,id),
+    sql(c, "SELECT p.handle,u.name,u.image FROM blocks b JOIN profiles p ON p.user_id=b.blocked JOIN user u ON u.id=p.user_id WHERE b.blocker=?", id),
     sql(c, "SELECT COUNT(*) AS count FROM pokes WHERE recipient=?", id),
   ]);
   const profile = results[0].results[0];
-  const friends = results[1].results;
-  return c.json({ me: { id, name: c.get("identity").user.name, email: c.get("identity").user.email, handle: profile?.handle ?? null, quiet: !!profile?.quiet },
+  const friends = results[1].results.map(withAvatar);
+  return c.json({ me: { id, name: c.get("identity").user.name, email: c.get("identity").user.email, image: githubAvatar(c.get("identity").user.image), handle: profile?.handle ?? null, quiet: !!profile?.quiet },
     friends: friends.filter(f => f.accepted), requests: friends.filter(f => !f.accepted),
-    inbox: results[2].results, history: results[3].results, blocked: results[4].results,
+    inbox: results[2].results.map(withAvatar), history: results[3].results.map(withAvatar), blocked: results[4].results.map(withAvatar),
     received: results[5].results[0]?.count ?? 0 });
 });
 
@@ -181,12 +189,13 @@ app.get("/api/history/:handle", async c => {
   if (cursor) args.push(cursor.createdAt, cursor.createdAt, cursor.id);
   args.push(historyPageSize + 1);
   const rows = (await sql(c, `SELECT k.id,CASE WHEN k.sender=? THEN q.handle ELSE p.handle END AS handle,
-      CASE WHEN k.sender=? THEN ru.name ELSE su.name END AS name,k.created_at,k.sender=? AS outgoing
+      CASE WHEN k.sender=? THEN ru.name ELSE su.name END AS name,
+      CASE WHEN k.sender=? THEN ru.image ELSE su.image END AS image,k.created_at,k.sender=? AS outgoing
       FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN profiles q ON q.user_id=k.recipient
       JOIN user su ON su.id=k.sender JOIN user ru ON ru.id=k.recipient
       WHERE ((k.sender=? AND k.recipient=?) OR (k.sender=? AND k.recipient=?))${condition}
-      ORDER BY k.created_at DESC,k.id DESC LIMIT ?`, uid(c), uid(c), uid(c), ...args).all()).results as Record<string, unknown>[];
-  const history = rows.slice(0, historyPageSize);
+      ORDER BY k.created_at DESC,k.id DESC LIMIT ?`, uid(c), uid(c), uid(c), uid(c), ...args).all()).results as Record<string, unknown>[];
+  const history = rows.slice(0, historyPageSize).map(withAvatar);
   const last = history[history.length - 1];
   return c.json({ history, next_cursor: rows.length > historyPageSize && last ? encodeHistoryCursor({ createdAt: Number(last.created_at), id: String(last.id) }) : null });
 });

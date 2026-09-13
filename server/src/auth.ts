@@ -14,7 +14,7 @@ export function createAuth(env: AppEnv) {
     database: drizzleAdapter(drizzle(env.DB, { schema }), { provider: "sqlite", schema, transaction: false }),
     trustedOrigins: [env.BASE_URL],
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
-    account: { encryptOAuthTokens: true, accountLinking: { enabled: true, disableImplicitLinking: true, requireLocalEmailVerified: true } },
+    account: { encryptOAuthTokens: true, accountLinking: { enabled: true, disableImplicitLinking: true, requireLocalEmailVerified: true, updateUserInfoOnLink: true } },
     rateLimit: { enabled: true, storage: "database", window: 60, max: 60 },
     advanced: { useSecureCookies: !local, ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
     socialProviders: env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET ? {

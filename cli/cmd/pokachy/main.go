@@ -37,6 +37,7 @@ type Config struct {
 type Person struct {
 	Handle   string `json:"handle"`
 	Name     string `json:"name"`
+	Image    string `json:"image"`
 	Outgoing int    `json:"outgoing"`
 	Waiting  int    `json:"waiting"`
 }
@@ -44,6 +45,7 @@ type Poke struct {
 	ID        string `json:"id"`
 	Handle    string `json:"handle"`
 	Name      string `json:"name"`
+	Image     string `json:"image"`
 	CreatedAt int64  `json:"created_at"`
 	Outgoing  int    `json:"outgoing"`
 }
@@ -52,6 +54,7 @@ type Me struct {
 	Handle string `json:"handle"`
 	Name   string `json:"name"`
 	Email  string `json:"email"`
+	Image  string `json:"image"`
 	Quiet  bool   `json:"quiet"`
 }
 type State struct {

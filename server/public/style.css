@@ -137,7 +137,10 @@ input::placeholder { color: #6f776c; }
 .connected-identity { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 19px; padding: 14px 15px; border: 1px solid #4d5a43; border-left: 3px solid var(--signal); border-radius: 4px; background: var(--signal-soft); }
 .connected-badge { display: flex; align-items: center; gap: 10px; color: var(--signal); font: 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .connected-badge span { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 4px rgba(201,255,114,.1); }
-#identity { color: var(--paper); font: 700 17px/1 var(--mono); }
+#identity { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--paper); font: 700 17px/1 var(--mono); }
+.profile-identity { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; justify-content: flex-end; }
+.profile-avatar { position: relative; display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; overflow: hidden; border-radius: 50%; background: #3b4b2c; color: var(--paper); font: 700 17px/1 var(--mono); }
+#profile-picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .quick-start { margin-top: 20px; }
 .quick-start-label { display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--faint); font: 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .quick-start-label span:first-child { color: #daddd3; }

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Controls
 import QtQuick.Controls as QQC
 import Quickshell
@@ -85,6 +86,7 @@ Panel {
   component AvatarButton: BorderSurface {
     id: avatar
     property string label: "?"
+    property string image: ""
     property string tooltipText: ""
     property color foreground: root.foreground
     property bool interactive: false
@@ -112,6 +114,7 @@ Panel {
     borderSpec: activeFocus ? Border.controlSpec("focus", foreground, foreground) : (expanded ? Border.controlSpec("selected", foreground, foreground) : Border.none())
 
     Text {
+      visible: photo.status !== Image.Ready
       anchors.centerIn: parent
       text: avatar.label
       textFormat: Text.PlainText
@@ -119,6 +122,33 @@ Panel {
       font.family: root.fontFamily
       font.pixelSize: Style.font.subtitle
       font.bold: true
+    }
+
+    Rectangle {
+      id: photoMask
+      anchors.fill: parent
+      radius: width / 2
+      color: "white"
+      antialiasing: true
+      visible: false
+      layer.enabled: true
+    }
+    Image {
+      id: photo
+      anchors.fill: parent
+      source: /^https:\/\/avatars\.githubusercontent\.com\//.test(avatar.image) ? avatar.image : ""
+      sourceSize.width: avatar.size
+      sourceSize.height: avatar.size
+      fillMode: Image.PreserveAspectCrop
+      asynchronous: true
+      cache: true
+      visible: status === Image.Ready
+      layer.enabled: true
+      layer.smooth: true
+      layer.effect: MultiEffect {
+        maskEnabled: true
+        maskSource: photoMask
+      }
     }
 
     MouseArea {
@@ -564,6 +594,7 @@ Panel {
             iconComponent: Component {
               AvatarButton {
                 label: root.needsLogin ? "" : root.avatarInitial(root.pokachyState.me)
+                image: root.needsLogin ? "" : String(root.pokachyState.me && root.pokachyState.me.image || "")
                 tooltipText: root.needsLogin ? "Pokachy" : "Your profile"
                 foreground: root.foreground
                 interactive: false
@@ -766,6 +797,7 @@ Panel {
                 anchors.leftMargin: Style.space(8)
                 anchors.verticalCenter: parent.verticalCenter
                 label: root.avatarInitial(root.activeFriend)
+                image: String(root.activeFriend && root.activeFriend.image || "")
                 tooltipText: root.displayName(root.activeFriend)
                 foreground: root.foreground
                 interactive: false
@@ -1077,6 +1109,7 @@ Panel {
           anchors.leftMargin: Style.space(4)
           anchors.verticalCenter: parent.verticalCenter
           label: root.avatarInitial(friendItem.modelData)
+          image: String(friendItem.modelData.image || "")
           tooltipText: ""
           foreground: root.foreground
           interactive: false
