@@ -187,7 +187,7 @@ footer i { color: var(--signal); font-style: normal; margin-left: 10px; }
 @media (max-width: 760px) {
   .site-header, footer { padding: 21px 22px; }
   .header-links a:first-of-type, .status-note { display: none; }
-  main { grid-template-columns: 1fr; padding: 38px 22px 60px; }
+  main { grid-template-columns: minmax(0, 1fr); padding: 38px 22px 60px; }
   .card { order: -1; box-shadow: 10px 10px 0 rgba(8,10,8,.75); }
   h1 { font-size: clamp(45px, 13vw, 64px); }
   .lede { font-size: 16px; }
