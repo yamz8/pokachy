@@ -359,6 +359,13 @@ def main() -> None:
         time.sleep(1)
         check(len(notify_log.read_text().splitlines()) == 1, "notification restart dedup")
 
+        history_result = run([str(binary), "history", "@bobby", "--json"], "CLI conversation history", cwd=ROOT, env=cli_env)
+        history = json.loads(history_result.stdout)
+        events = history.get("history", [])
+        check(len(events) == 2 and all(p.get("handle") == "bobby" for p in events)
+              and {p.get("outgoing") for p in events} == {0, 1}
+              and history.get("next_cursor") is None, "CLI history preserves both directions and contact scope")
+
         inbox = run([str(binary), "inbox", "--json"], "CLI inbox", cwd=ROOT, env=cli_env)
         pending = json.loads(inbox.stdout)
         check(isinstance(pending, list) and len(pending) == 1 and isinstance(pending[0].get("id"), str), "CLI inbox state")

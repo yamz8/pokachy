@@ -38,6 +38,46 @@ func TestValidServer(t *testing.T) {
 	}
 }
 
+func TestHistoryEncodesCursorAndKeepsDirection(t *testing.T) {
+	cursor := "opaque+/=&cursor"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/history/friend" || r.URL.Query().Get("before") != cursor || r.Method != "GET" {
+			t.Errorf("unexpected history request: %s", r.URL)
+		}
+		if r.Header.Get("Authorization") != "Bearer fixture-token" {
+			t.Error("missing authentication")
+		}
+		io.WriteString(w, `{"history":[{"id":"fixture","handle":"friend","created_at":123,"outgoing":1}],"next_cursor":"older"}`)
+	}))
+	defer server.Close()
+	c := &Client{Config: Config{Server: server.URL, Token: "fixture-token"}, HTTP: server.Client()}
+	page, err := c.history(context.Background(), "@friend", cursor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.History) != 1 || page.History[0].Outgoing != 1 || page.NextCursor == nil || *page.NextCursor != "older" {
+		t.Fatalf("unexpected history: %+v", page)
+	}
+}
+
+func TestNotificationIconFallbackAndAsset(t *testing.T) {
+	dataHome := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", dataHome)
+	if got := notificationIcon(); got != "mail-unread" {
+		t.Fatalf("fallback = %q", got)
+	}
+	icon := filepath.Join(dataHome, "icons", "hicolor", "scalable", "apps", "pokachy.svg")
+	if err := os.MkdirAll(filepath.Dir(icon), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(icon, []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got := notificationIcon(); got != icon {
+		t.Fatalf("icon = %q, want %q", got, icon)
+	}
+}
+
 func TestAddFragmentHintsUsesBrowserDecodableQueryEncoding(t *testing.T) {
 	verification, err := url.Parse("https://pokachy.example/activate?user_code=ABCDEFGH")
 	if err != nil {

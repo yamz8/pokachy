@@ -13,6 +13,22 @@ const error = (c: Ctx, message: string, status: 400 | 401 | 403 | 404 | 409 | 42
 const uid = (c: Ctx) => c.get("identity").user.id;
 const pair = (a: string, b: string) => [a, b].sort();
 const sql = (c: Ctx, query: string, ...args: unknown[]) => c.env.DB.prepare(query).bind(...args);
+const historyPageSize = 50;
+type HistoryCursor = { createdAt: number; id: string };
+function encodeHistoryCursor(cursor: HistoryCursor) {
+  return btoa(JSON.stringify(cursor)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+function decodeHistoryCursor(value: string | undefined): HistoryCursor | null {
+  if (!value || value.length > 256 || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
+  try {
+    const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+    const parsed = JSON.parse(atob(base64 + "=".repeat((4 - base64.length % 4) % 4))) as Partial<HistoryCursor> | null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const createdAt = parsed.createdAt;
+    if (typeof createdAt !== "number" || !Number.isSafeInteger(createdAt) || createdAt < 0 || typeof parsed.id !== "string" || !/^[A-Za-z0-9-]{1,100}$/.test(parsed.id)) return null;
+    return { createdAt, id: parsed.id };
+  } catch { return null; }
+}
 async function target(c: Ctx, handle: string) {
   return sql(c, "SELECT p.user_id AS id, p.handle FROM profiles p WHERE handle=? AND suspended=0", handle.replace(/^@/, "").toLowerCase()).first<{ id: string; handle: string }>();
 }
@@ -149,6 +165,30 @@ app.get("/api/state", async c => {
     friends: friends.filter(f => f.accepted), requests: friends.filter(f => !f.accepted),
     inbox: results[2].results, history: results[3].results, blocked: results[4].results,
     received: results[5].results[0]?.count ?? 0 });
+});
+
+app.get("/api/history/:handle", async c => {
+  const other = await target(c, c.req.param("handle"));
+  if (!other || other.id === uid(c)) return error(c, "Friend not found", 404);
+  const [a, b] = pair(uid(c), other.id);
+  const friendship = await sql(c, "SELECT 1 FROM friendships WHERE a=? AND b=? AND accepted=1", a, b).first();
+  if (!friendship) return error(c, "Friend not found", 404);
+  const rawCursor = c.req.query("before");
+  const cursor = decodeHistoryCursor(rawCursor);
+  if (rawCursor && !cursor) return error(c, "Invalid history cursor");
+  const condition = cursor ? " AND (k.created_at < ? OR (k.created_at = ? AND k.id < ?))" : "";
+  const args: unknown[] = [a, b, b, a];
+  if (cursor) args.push(cursor.createdAt, cursor.createdAt, cursor.id);
+  args.push(historyPageSize + 1);
+  const rows = (await sql(c, `SELECT k.id,CASE WHEN k.sender=? THEN q.handle ELSE p.handle END AS handle,
+      CASE WHEN k.sender=? THEN ru.name ELSE su.name END AS name,k.created_at,k.sender=? AS outgoing
+      FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN profiles q ON q.user_id=k.recipient
+      JOIN user su ON su.id=k.sender JOIN user ru ON ru.id=k.recipient
+      WHERE ((k.sender=? AND k.recipient=?) OR (k.sender=? AND k.recipient=?))${condition}
+      ORDER BY k.created_at DESC,k.id DESC LIMIT ?`, uid(c), uid(c), uid(c), ...args).all()).results as Record<string, unknown>[];
+  const history = rows.slice(0, historyPageSize);
+  const last = history[history.length - 1];
+  return c.json({ history, next_cursor: rows.length > historyPageSize && last ? encodeHistoryCursor({ createdAt: Number(last.created_at), id: String(last.id) }) : null });
 });
 
 app.use("/api/friends/*", async (c,next) => {
