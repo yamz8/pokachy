@@ -719,7 +719,8 @@ Panel {
               tooltipText: root.pokachyState.me && root.pokachyState.me.quiet ? "Resume notifications" : "Quiet notifications"
               foreground: root.foreground
               fontFamily: root.fontFamily
-              size: Style.space(28)
+              size: Style.space(36)
+              fontSize: Style.space(20)
               focusable: true
               Accessible.name: tooltipText
               onClicked: root.runAction("Updating quiet mode…", ["quiet", root.pokachyState.me && root.pokachyState.me.quiet ? "off" : "on"])
@@ -1151,6 +1152,7 @@ Panel {
 
             PokeButton {
               id: conversationPoke
+              focusFallback: conversationBack
               fontFamily: root.fontFamily
               foreground: root.activeIncomingPoke ? Color.accent : root.foreground
               width: parent.width
@@ -1223,6 +1225,7 @@ Panel {
           Text {
             width: parent.width
             text: root.displayName(friendItem.modelData)
+            font.bold: true
             textFormat: Text.PlainText
             elide: Text.ElideRight
             color: root.foreground
@@ -1282,6 +1285,7 @@ Panel {
           waiting: friendItem.waitingForReply
           busy: root.actionRunning
           contactHandle: friendItem.friendHandle
+          focusFallback: openFriend
           onActiveFocusChanged: if (activeFocus)
             root.ensureListItemVisible(friendItem)
           onClicked: root.runAction("Sending poke…", ["poke", "@" + friendItem.friendHandle])
