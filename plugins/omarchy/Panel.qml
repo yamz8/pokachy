@@ -119,16 +119,10 @@ Panel {
       avatar.clicked()
 
     readonly property bool hot: interactive && avatarMouse.containsMouse
-    onHotChanged: {
-      if (openHistoryOnHover && hot && root.opened && !root.activeFriend)
-        hoverHistoryTimer.restart()
-      else
-        hoverHistoryTimer.stop()
-    }
-    onVisibleChanged: if (!visible) hoverHistoryTimer.stop()
     Timer {
       id: hoverHistoryTimer
       interval: 450
+      running: avatar.openHistoryOnHover && avatar.hot && avatar.visible && root.opened && !root.activeFriend && !panelScroll.moving && !panelScroll.dragging
       onTriggered: {
         if (avatar.openHistoryOnHover && avatar.hot && avatar.visible && root.opened && !root.activeFriend && !panelScroll.moving && !panelScroll.dragging)
           avatar.hoverActivated()
@@ -182,7 +176,6 @@ Panel {
       enabled: avatar.interactive
       cursorShape: Qt.PointingHandCursor
       onClicked: {
-        hoverHistoryTimer.stop()
         avatar.forceActiveFocus()
         avatar.clicked()
       }
