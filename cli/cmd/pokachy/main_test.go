@@ -38,7 +38,7 @@ func TestValidServer(t *testing.T) {
 	}
 }
 
-func TestHistoryEncodesCursorAndKeepsDirection(t *testing.T) {
+func TestHistoryEncodesCursorAndKeepsDirectionAndImage(t *testing.T) {
 	cursor := "opaque+/=&cursor"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/history/friend" || r.URL.Query().Get("before") != cursor || r.Method != "GET" {
@@ -47,7 +47,7 @@ func TestHistoryEncodesCursorAndKeepsDirection(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer fixture-token" {
 			t.Error("missing authentication")
 		}
-		io.WriteString(w, `{"history":[{"id":"fixture","handle":"friend","created_at":123,"outgoing":1}],"next_cursor":"older"}`)
+		io.WriteString(w, `{"history":[{"id":"fixture","handle":"friend","image":"https://avatars.githubusercontent.com/u/9919?v=4","created_at":123,"outgoing":1}],"next_cursor":"older"}`)
 	}))
 	defer server.Close()
 	c := &Client{Config: Config{Server: server.URL, Token: "fixture-token"}, HTTP: server.Client()}
@@ -55,7 +55,7 @@ func TestHistoryEncodesCursorAndKeepsDirection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.History) != 1 || page.History[0].Outgoing != 1 || page.NextCursor == nil || *page.NextCursor != "older" {
+	if len(page.History) != 1 || page.History[0].Outgoing != 1 || page.History[0].Image != "https://avatars.githubusercontent.com/u/9919?v=4" || page.NextCursor == nil || *page.NextCursor != "older" {
 		t.Fatalf("unexpected history: %+v", page)
 	}
 }

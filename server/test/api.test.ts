@@ -74,6 +74,8 @@ test("administrators can review reports and suspend another user",async()=>{
 
 test("history is friend-scoped and cursor-paginated",async()=>{
   const a=await user("historyalice"), b=await user("historybobby"), outsider=await user("historyoutsider");
+  const image="https://avatars.githubusercontent.com/u/9919?v=4";
+  await env.DB.prepare("UPDATE user SET image=? WHERE id=?").bind(image,b.user.id).run();
   expect((await request("/api/friends/historybobby",a.token,"POST",{})).status).toBe(200);
   expect((await request("/api/friends/historyalice/accept",b.token,"POST",{})).status).toBe(200);
   for(let i=0;i<52;i++) {
@@ -82,7 +84,7 @@ test("history is friend-scoped and cursor-paginated",async()=>{
   }
   const first=await request("/api/history/historybobby",a.token);
   expect(first.status).toBe(200);
-  const page=await first.json() as {history: {id:string;handle:string;created_at:number;outgoing:number}[];next_cursor:string|null};
+  const page=await first.json() as {history: {id:string;handle:string;image:string|null;created_at:number;outgoing:number}[];next_cursor:string|null};
   expect(page.history).toHaveLength(50); expect(page.next_cursor).toEqual(expect.any(String));
   const second=await request(`/api/history/historybobby?before=${encodeURIComponent(page.next_cursor!)}`,a.token);
   expect(second.status).toBe(200);
@@ -91,6 +93,7 @@ test("history is friend-scoped and cursor-paginated",async()=>{
   const all=page.history.concat(older.history);
   expect(new Set(all.map(p=>p.id)).size).toBe(52);
   expect(all.every(p=>p.handle==="historybobby")).toBe(true);
+  expect(all.every(p=>p.image===image)).toBe(true);
   expect(all.filter(p=>p.outgoing===1)).toHaveLength(26);
   expect(all.map(p=>p.created_at)).toEqual(all.map(p=>p.created_at).sort((a,b)=>b-a));
   expect((await request("/api/history/historybobby?before=bad",a.token)).status).toBe(400);
@@ -127,6 +130,33 @@ test("bad and replayed email codes fail; handles are unique",async()=>{
   const used=await (await request("/api/dev/mail?email=uniqueuser@example.test")).json();
   expect((await request("/api/auth/sign-in/email-otp",undefined,"POST",{email:"uniqueuser@example.test",otp:used.otp})).ok).toBe(false);
   expect((await request("/api/profile",u.token,"PUT",null)).status).toBe(400);
+});
+
+test("state exposes only GitHub profile pictures",async()=>{
+  const a=await user("avataralice"),b=await user("avatarbobby");
+  const githubImage="https://avatars.githubusercontent.com/u/123456?v=4";
+  await env.DB.batch([
+    env.DB.prepare("UPDATE user SET image=? WHERE id=?").bind(githubImage,a.user.id),
+    env.DB.prepare("UPDATE user SET image=? WHERE id=?").bind("https://tracker.example/avatar.png",b.user.id),
+  ]);
+  await request("/api/friends/avatarbobby",a.token,"POST",{});
+  expect((await (await request("/api/state",b.token)).json()).requests[0].image).toBe(githubImage);
+  await request("/api/friends/avataralice/accept",b.token,"POST",{});
+  expect((await request("/api/pokes/avatarbobby",a.token,"POST",{}, {"Idempotency-Key":crypto.randomUUID()})).status).toBe(201);
+  const alice=await (await request("/api/state",a.token)).json();
+  const bobby=await (await request("/api/state",b.token)).json();
+  expect(alice.me.image).toBe(githubImage);
+  expect(alice.friends[0].image).toBeNull();
+  expect(alice.history[0].image).toBeNull();
+  expect(bobby.me.image).toBeNull();
+  expect(bobby.friends[0].image).toBe(githubImage);
+  expect(bobby.inbox[0].image).toBe(githubImage);
+  expect((await (await request("/api/history/avataralice",b.token)).json()).history[0].image).toBe(githubImage);
+  expect((await (await request("/api/history/avatarbobby",a.token)).json()).history[0].image).toBeNull();
+  for(const rejected of [null,"not a URL","http://avatars.githubusercontent.com/u/1","https://avatars.githubusercontent.com.evil.test/u/1","https://user@avatars.githubusercontent.com/u/1","https://avatars.githubusercontent.com:444/u/1"]) {
+    await env.DB.prepare("UPDATE user SET image=? WHERE id=?").bind(rejected,a.user.id).run();
+    expect((await (await request("/api/state",b.token)).json()).friends[0].image).toBeNull();
+  }
 });
 
 test("live updates stay private and a revoked session loses its connection",async()=>{

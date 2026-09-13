@@ -28,8 +28,21 @@ function showApproval(code) {
   $("approve").hidden=false;$("device-code").textContent=code;$("card-title").textContent="Connect this desktop.";$("card-description").textContent="Compare this code with the one shown in your terminal.";
 }
 function showConnected(handle) {
+  renderAvatar(state.me);
   $("connected").hidden=false;$("identity").textContent=`@${handle}`;$("card-title").textContent="Send a tiny signal.";$("card-description").textContent="Your account is ready. Here are two ways to start.";$("link-github").hidden=!config.github;
   $("sessions").hidden=true;$("sessions-toggle").setAttribute("aria-expanded","false");$("sessions-icon").textContent="+";
+}
+function renderAvatar(person) {
+  const initial=String(person.handle||person.name||"?").trim().replace(/^@/,"").charAt(0).toUpperCase()||"?";
+  $("profile-initial").textContent=initial;
+  const picture=$("profile-picture");picture.hidden=true;
+  picture.onload=()=>{picture.hidden=false;};
+  picture.onerror=()=>{picture.hidden=true;};
+  try {
+    const url=new URL(person.image);
+    if(url.origin!=="https://avatars.githubusercontent.com"||url.username||url.password) throw new Error("Unsupported avatar");
+    picture.src=url.href;
+  } catch { picture.removeAttribute("src"); }
 }
 function sessionName(agent) {
   const value=typeof agent==="string"?agent:"";
