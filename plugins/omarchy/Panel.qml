@@ -118,7 +118,7 @@ Panel {
 
     readonly property bool hot: interactive && avatarMouse.containsMouse
     color: activeFocus ? Style.focusFillFor(foreground, foreground) : (hot || expanded ? Style.selectedFillFor(foreground, foreground) : Qt.rgba(foreground.r, foreground.g, foreground.b, 0.12))
-    borderSpec: activeFocus ? Border.controlSpec("focus", foreground, foreground) : (expanded ? Border.controlSpec("selected", foreground, foreground) : Border.none())
+    borderSpec: expanded ? Border.controlSpec("selected", foreground, foreground) : Border.none()
 
     Text {
       visible: photo.status !== Image.Ready
@@ -168,6 +168,20 @@ Panel {
         avatar.forceActiveFocus()
         avatar.clicked()
       }
+    }
+
+    // Draw focus above the photo: the Image fills the avatar surface and
+    // otherwise covers its native Rectangle border when loaded.
+    BorderSurface {
+      objectName: "avatarFocusRing"
+      anchors.fill: parent
+      anchors.margins: -Style.space(2)
+      radius: avatar.radius + Style.space(2)
+      z: 10
+      visible: avatar.interactive && avatar.activeFocus
+      color: "transparent"
+      borderSpec: Border.controlSpec("focus", avatar.foreground, avatar.foreground)
+      Accessible.ignored: true
     }
 
     PanelToolTip {
