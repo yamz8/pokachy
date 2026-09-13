@@ -98,6 +98,8 @@ Panel {
     property color foreground: root.foreground
     property bool interactive: false
     property bool expanded: false
+    property bool openHistoryOnHover: false
+    signal hoverActivated
     property real size: Style.space(34)
     signal clicked
 
@@ -117,6 +119,21 @@ Panel {
       avatar.clicked()
 
     readonly property bool hot: interactive && avatarMouse.containsMouse
+    onHotChanged: {
+      if (openHistoryOnHover && hot && root.opened && !root.activeFriend)
+        hoverHistoryTimer.restart()
+      else
+        hoverHistoryTimer.stop()
+    }
+    onVisibleChanged: if (!visible) hoverHistoryTimer.stop()
+    Timer {
+      id: hoverHistoryTimer
+      interval: 450
+      onTriggered: {
+        if (avatar.openHistoryOnHover && avatar.hot && avatar.visible && root.opened && !root.activeFriend && !panelScroll.moving && !panelScroll.dragging)
+          avatar.hoverActivated()
+      }
+    }
     color: activeFocus ? Style.focusFillFor(foreground, foreground) : (hot || expanded ? Style.selectedFillFor(foreground, foreground) : Qt.rgba(foreground.r, foreground.g, foreground.b, 0.12))
     borderSpec: activeFocus ? Border.controlSpec("focus", foreground, foreground) : (expanded ? Border.controlSpec("selected", foreground, foreground) : Border.none())
 
@@ -165,6 +182,7 @@ Panel {
       enabled: avatar.interactive
       cursorShape: Qt.PointingHandCursor
       onClicked: {
+        hoverHistoryTimer.stop()
         avatar.forceActiveFocus()
         avatar.clicked()
       }
@@ -1183,25 +1201,13 @@ Panel {
       width: content.width
       height: Style.space(48)
 
-      BorderSurface {
-        id: openFriend
+      Item {
+        id: friendIdentity
         anchors.left: parent.left
         anchors.right: rowActions.left
         anchors.rightMargin: Style.space(8)
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        radius: 0
-        activeFocusOnTab: true
-        onActiveFocusChanged: if (activeFocus)
-          root.ensureListItemVisible(friendItem)
-        color: activeFocus ? Style.focusFillFor(root.foreground, root.foreground) : (openFriendMouse.containsMouse ? Style.hoverFillFor(root.foreground, root.foreground) : "transparent")
-        borderSpec: activeFocus ? Border.controlSpec("focus", root.foreground, root.foreground) : Border.none()
-        Keys.onReturnPressed: root.openConversation(friendItem.modelData)
-        Keys.onEnterPressed: root.openConversation(friendItem.modelData)
-        Keys.onSpacePressed: root.openConversation(friendItem.modelData)
-        Accessible.role: Accessible.Button
-        Accessible.name: "Open poke history with @" + friendItem.friendHandle
-        Accessible.onPressAction: root.openConversation(friendItem.modelData)
 
         AvatarButton {
           id: friendAvatar
@@ -1210,9 +1216,15 @@ Panel {
           anchors.verticalCenter: parent.verticalCenter
           label: root.avatarInitial(friendItem.modelData)
           image: String(friendItem.modelData.image || "")
-          tooltipText: ""
+          tooltipText: "Open poke history with @" + friendItem.friendHandle
           foreground: root.foreground
-          interactive: false
+          interactive: true
+          size: Style.space(36)
+          openHistoryOnHover: true
+          onHoverActivated: root.openConversation(friendItem.modelData)
+          onClicked: root.openConversation(friendItem.modelData)
+          onActiveFocusChanged: if (activeFocus)
+            root.ensureListItemVisible(friendItem)
         }
 
         Column {
@@ -1243,16 +1255,7 @@ Panel {
           }
         }
 
-        MouseArea {
-          id: openFriendMouse
-          anchors.fill: parent
-          hoverEnabled: true
-          cursorShape: Qt.PointingHandCursor
-          onClicked: {
-            openFriend.forceActiveFocus()
-            root.openConversation(friendItem.modelData)
-          }
-        }
+
       }
 
       Row {
@@ -1285,7 +1288,7 @@ Panel {
           waiting: friendItem.waitingForReply
           busy: root.actionRunning
           contactHandle: friendItem.friendHandle
-          focusFallback: openFriend
+          focusFallback: friendAvatar
           onActiveFocusChanged: if (activeFocus)
             root.ensureListItemVisible(friendItem)
           onClicked: root.runAction("Sending poke…", ["poke", "@" + friendItem.friendHandle])
