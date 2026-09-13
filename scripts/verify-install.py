@@ -147,6 +147,8 @@ def main() -> int:
             required = ["bin/pokachy", "scripts/install.sh", "packaging/systemd/pokachy.service",
                         "manifest.json", "README.md", "LICENSE", "plugins/omarchy/BarWidget.qml",
                         "plugins/omarchy/Panel.qml", "plugins/omarchy/BrandIcon.qml",
+                        "plugins/omarchy/PokeButton.qml", "plugins/omarchy/PokeHand.qml",
+                        "plugins/omarchy/SquareKeyboardPanel.qml",
                         "assets/brand/pokachy-parrot.svg", "assets/brand/pokachy-symbol.svg"]
             roots: dict[str, Path] = {}
             for archive in archives:
