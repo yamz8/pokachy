@@ -98,8 +98,6 @@ Panel {
     property color foreground: root.foreground
     property bool interactive: false
     property bool expanded: false
-    property bool openHistoryOnHover: false
-    signal hoverActivated
     property real size: Style.space(34)
     signal clicked
 
@@ -119,15 +117,6 @@ Panel {
       avatar.clicked()
 
     readonly property bool hot: interactive && avatarMouse.containsMouse
-    Timer {
-      id: hoverHistoryTimer
-      interval: 450
-      running: avatar.openHistoryOnHover && avatar.hot && avatar.visible && root.opened && !root.activeFriend && !panelScroll.moving && !panelScroll.dragging
-      onTriggered: {
-        if (avatar.openHistoryOnHover && avatar.hot && avatar.visible && root.opened && !root.activeFriend && !panelScroll.moving && !panelScroll.dragging)
-          avatar.hoverActivated()
-      }
-    }
     color: activeFocus ? Style.focusFillFor(foreground, foreground) : (hot || expanded ? Style.selectedFillFor(foreground, foreground) : Qt.rgba(foreground.r, foreground.g, foreground.b, 0.12))
     borderSpec: activeFocus ? Border.controlSpec("focus", foreground, foreground) : (expanded ? Border.controlSpec("selected", foreground, foreground) : Border.none())
 
@@ -1213,8 +1202,6 @@ Panel {
           foreground: root.foreground
           interactive: true
           size: Style.space(36)
-          openHistoryOnHover: true
-          onHoverActivated: root.openConversation(friendItem.modelData)
           onClicked: root.openConversation(friendItem.modelData)
           onActiveFocusChanged: if (activeFocus)
             root.ensureListItemVisible(friendItem)
