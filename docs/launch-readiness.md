@@ -33,6 +33,8 @@ Before widening the pilot, review support volume, delivery failures, reports, ac
 
 ## Read-only monitoring and response
 
+On 2026-09-14, the enabled Cloudflare policy **Pokachy infrastructure incidents** was configured for minor, major, and critical incidents affecting Workers, Workers Assets, D1, Durable Objects, Queues, Email Routing, Email Sending, Authoritative DNS, and DNS Updates. Its recipient is the owner's designated private operations inbox. The policy was read back successfully, Cloudflare accepted its test notification, and the owner confirmed the test email arrived. This covers Cloudflare-reported infrastructure incidents; it does not detect Pokachy's own application errors, queue backlog, or delivery failures.
+
 Once merged into the default branch, `.github/workflows/monitor.yml` runs the existing `scripts/verify-live.py` every 30 minutes and can also be dispatched manually. It makes only unauthenticated public HTTPS requests to `https://pokachy.com`; it creates no account, email, poke, deployment, secret, or Cloudflare API request. Each run writes and retains `artifacts/live-verification.json` as a GitHub Actions artifact for 30 days. GitHub schedules may be delayed; this is a basic smoke monitor, not a real-time availability guarantee.
 
 The workflow fails when health, public configuration, production development-mail isolation, unauthenticated access control, homepage, or public assets fail. It uses no production secrets and has only `contents: read` permission. A scheduled failure should produce the normal GitHub Actions workflow-failure notification for watchers/subscribers whose GitHub notification settings allow it. Configure and test those notifications for the operations owner; GitHub workflow notifications and a retained report are not a substitute for independently configured external paging or alerting.
@@ -53,7 +55,7 @@ The repository has deployment recovery metadata and a documented rollback path, 
 
 ## Outstanding launch gates
 
-- Configure a named operations owner and external alerts for Worker availability/errors, D1 errors and capacity, queue depth/retries, dead-letter queue growth, email-delivery failures, domain/DNS expiry, and Cloudflare/GitHub billing or quota events. No dashboard alert, billing alert, or dead-letter-queue alert configuration is evidenced by this repository.
+- The owner receives verified Cloudflare infrastructure incident alerts. Add application-specific alerts for Worker availability/errors, D1 errors and capacity, queue depth/retries, dead-letter queue growth, email-delivery failures, domain expiry, and Cloudflare/GitHub billing or quota events. Those separate rules are not yet configured. Inspection of the available Workers Observability dashboard and API did not expose a rule-creation control; a notification policy alone would not establish an application-error trigger.
 - Test that the GitHub Actions failure notification reaches the responsible operator. The scheduled workflow is added here but has not been observed running in this change.
 - Complete the isolated recovery rehearsal above and keep the result with the deployment record.
 - Complete positive report, moderation, suspension, and session-revocation validation only with disposable accounts explicitly authorized for that purpose.
