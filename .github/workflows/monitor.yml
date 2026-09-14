@@ -1,0 +1,39 @@
+name: Production smoke monitor
+
+on:
+  schedule:
+    - cron: '17,47 * * * *'
+  workflow_dispatch:
+
+# This workflow makes unauthenticated HTTPS requests only. It has no Cloudflare
+# credential, environment, deployment, or repository-write permission.
+permissions:
+  contents: read
+
+concurrency:
+  group: pokachy-production-smoke-monitor
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check public production endpoints
+        run: python3 scripts/verify-live.py
+      - name: Save smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/live-verification.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Failure guidance
+        if: failure()
+        run: |
+          echo 'Read-only smoke check failed. Download the production-smoke artifact, inspect the GitHub Actions failure notification, and follow docs/deployment.md. Do not retry a deployment automatically.' >> "$GITHUB_STEP_SUMMARY"

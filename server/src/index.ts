@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { createAuth } from "./auth";
+import { accountRoutes } from "./account-deletion";
+import { cleanExpiredAuth } from "./retention";
 import { isLocal, type AppEnv, type MailJob } from "./env";
 export { UserHub } from "./hub";
 
@@ -124,6 +126,8 @@ app.get("/api/dev/mail", async c => {
   const row = await sql(c, "SELECT otp FROM dev_mail WHERE email=? AND expires_at>?", c.req.query("email") ?? "", Date.now()).first();
   return c.json(row ?? {});
 });
+
+app.route("/api/account", accountRoutes);
 
 app.use("/api/*", async (c, next) => {
   const identity = await createAuth(c.env).api.getSession({ headers: c.req.raw.headers });
@@ -282,7 +286,7 @@ app.post("/api/blocks/:handle",async c=>{
   return c.json({ok:true});
 });
 app.delete("/api/blocks/:handle",async c=>{
-  await sql(c,"DELETE FROM blocks WHERE blocker=? AND blocked=(SELECT user_id FROM profiles WHERE handle=?)",uid(c),c.req.param("handle").replace(/^@/,"")).run();
+  await sql(c,"DELETE FROM blocks WHERE blocker=? AND blocked=(SELECT user_id FROM profiles WHERE handle=?)",uid(c),c.req.param("handle").replace(/^@/,"").toLowerCase()).run();
   return c.json({ok:true});
 });
 app.post("/api/reports/:handle",async c=>{
@@ -297,11 +301,49 @@ app.use("/api/admin/*",async(c,next)=>{
   if(!c.env.ADMIN_USER_IDS.split(",").filter(Boolean).includes(uid(c))) return error(c,"Administrator access required",403);
   await next();
 });
-app.get("/api/admin/reports",async c=>c.json((await sql(c,"SELECT r.*,p.handle FROM reports r JOIN profiles p ON p.user_id=r.reported WHERE resolved=0 ORDER BY created_at DESC LIMIT 100").all()).results));
+app.get("/api/admin/reports",async c=>{
+  const page=c.req.query("page");
+  if (page===undefined) return c.json((await sql(c,"SELECT r.*,p.handle FROM reports r JOIN profiles p ON p.user_id=r.reported WHERE resolved=0 ORDER BY created_at DESC,id DESC LIMIT 100").all()).results);
+  if (page!=="true") return error(c,"Invalid reports pagination request");
+  const status=c.req.query("status")??"open";
+  const resolved=status==="open" ? 0 : status==="resolved" ? 1 : status==="all" ? null : undefined;
+  if (resolved===undefined) return error(c,"Invalid report status");
+  const rawCursor=c.req.query("before");
+  const cursor=decodeHistoryCursor(rawCursor);
+  if(rawCursor&&!cursor) return error(c,"Invalid reports cursor");
+  const conditions:string[]=[];
+  const args:unknown[]=[];
+  if(resolved!==null){conditions.push("r.resolved=?");args.push(resolved);}
+  if(cursor){conditions.push("(r.created_at < ? OR (r.created_at = ? AND r.id < ?))");args.push(cursor.createdAt,cursor.createdAt,cursor.id);}
+  args.push(51);
+  const where=conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const rows=(await sql(c,`SELECT r.*,p.handle FROM reports r JOIN profiles p ON p.user_id=r.reported ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT ?`,...args).all()).results as Record<string,unknown>[];
+  const reports=rows.slice(0,50);
+  const last=reports[reports.length-1];
+  return c.json({reports,next_cursor:rows.length>50&&last?encodeHistoryCursor({createdAt:Number(last.created_at),id:String(last.id)}):null});
+});
+app.post("/api/admin/reports/:id/resolve",async c=>{
+  const result=await sql(c,"UPDATE reports SET resolved=1 WHERE id=? AND resolved=0",c.req.param("id")).run();
+  if(!result.meta.changes) return error(c,"Report not found",404);
+  return c.json({ok:true});
+});
+app.post("/api/admin/reports/:id/reopen",async c=>{
+  const result=await sql(c,"UPDATE reports SET resolved=0 WHERE id=? AND resolved=1",c.req.param("id")).run();
+  if(!result.meta.changes) return error(c,"Report not found",404);
+  return c.json({ok:true});
+});
 app.post("/api/admin/suspend/:handle",async c=>{
   const other=await target(c,c.req.param("handle"));
   if(!other || other.id===uid(c)) return error(c,"User not found",404);
   await c.env.DB.batch([sql(c,"UPDATE profiles SET suspended=1 WHERE user_id=?",other.id),sql(c,"DELETE FROM session WHERE userId=?",other.id)]);
+  await notify(c,other.id);
+  return c.json({ok:true});
+});
+app.post("/api/admin/unsuspend/:handle",async c=>{
+  const handle=c.req.param("handle").replace(/^@/,"").toLowerCase();
+  const other=await sql(c,"SELECT user_id AS id FROM profiles WHERE handle=?",handle).first<{id:string}>();
+  if(!other || other.id===uid(c)) return error(c,"User not found",404);
+  await sql(c,"UPDATE profiles SET suspended=0 WHERE user_id=? AND suspended=1",other.id).run();
   await notify(c,other.id);
   return c.json({ok:true});
 });
@@ -324,6 +366,9 @@ app.onError((err,c)=>{
 });
 export default {
   fetch: app.fetch,
+  async scheduled(_controller: ScheduledController, env: AppEnv): Promise<void> {
+    await cleanExpiredAuth(env);
+  },
   async queue(batch: MessageBatch<MailJob>,env: AppEnv):Promise<void>{
     for(const message of batch.messages){
       const job=message.body;
