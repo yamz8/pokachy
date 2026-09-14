@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Delete your account — Pokachy</title>
+  <link rel="icon" href="/icon.png"><link rel="stylesheet" href="/style.css">
+  <script src="/delete-account.js" defer></script>
+</head>
+<body>
+  <header class="site-header"><a class="brand" href="/">pokachy</a><a href="/account">Back to account</a></header>
+  <main class="document-main"><section class="card document-card">
+    <h1>Delete your account</h1>
+    <p>This permanently removes your profile, linked sign-ins, friendships, blocks, poke history, and reports involving your account from the active database. All signed-in devices lose access. Your handle becomes available again.</p>
+    <p>You cannot undo this. Friends lose the shared history on the server too. Recovery copies can retain deleted data for up to 30 days. An email already queued may still arrive, but its deleted sign-in code will no longer work.</p>
+    <p>Offline computers and desktop notification history cannot be erased remotely. Run <code>pokachy logout</code> on each computer to remove Pokachy’s saved credentials and cache, and clear any desktop notification history separately.</p>
+    <p id="deletion-status" role="status" aria-live="polite">Checking your sign-in…</p>
+    <a id="deletion-signin" href="/account" hidden>Sign in, then return to this page</a>
+    <button id="deletion-reauth" class="button secondary full" type="button" hidden>Sign out to verify my identity again</button>
+    <form id="deletion-form" hidden>
+      <button id="deletion-send-code" class="button secondary full" type="button">Email me a deletion code</button>
+      <button id="deletion-local-code" class="text-button" type="button" hidden>Fill the development code</button>
+      <label for="deletion-otp">Deletion code from your email</label>
+      <input id="deletion-otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+      <label for="deletion-confirmation">Type DELETE MY ACCOUNT to confirm</label>
+      <input id="deletion-confirmation" autocomplete="off" spellcheck="false" required pattern="DELETE MY ACCOUNT">
+      <button class="button full" type="submit">Permanently delete my account</button>
+    </form>
+    <p class="fine"><a href="/privacy.html">Privacy and retention</a> · <a href="/support.html">Get help</a></p>
+  </section></main>
+</body>
+</html>

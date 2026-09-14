@@ -21,6 +21,7 @@
   "env": {
     "production": {
       "name": "pokachy",
+      "triggers": {"crons": ["17 * * * *"]},
       "secrets": {"required": ["ADMIN_USER_IDS", "BETTER_AUTH_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "TURNSTILE_SECRET"]},
       "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>"},
       "routes": [{"pattern": "pokachy.com", "custom_domain": true}],

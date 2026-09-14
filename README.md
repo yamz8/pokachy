@@ -6,7 +6,13 @@ A tiny way to say hey to your Linux friends. Poke from your terminal or Omarchy 
 
 ## Install
 
-Download and extract the Linux release archive for your architecture: `amd64` for most PCs, `arm64` for ARM machines. Each release includes `SHA256SUMS`. From the extracted directory:
+Download the Linux release archive for your architecture: `amd64` for most PCs, `arm64` for ARM machines, plus its `SHA256SUMS` file from the same [GitHub release](https://github.com/yamz8/pokachy/releases/latest). Verify the downloaded archive before extracting it:
+
+```sh
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+From the extracted directory:
 
 ```sh
 bash scripts/install.sh
@@ -19,7 +25,27 @@ The installer copies the CLI into `~/.local/bin` and installs a user service. En
 
 Sign in with email or GitHub, choose a handle, compare the browser device code with your terminal, and approve it. Omarchy/Git setup values can prefill editable suggestions with your confirmation. Email verification is still required.
 
+To upgrade, download and verify the newer release, extract it, run its `bash scripts/install.sh`, then reload and restart the user service:
+
+```sh
+systemctl --user daemon-reload
+systemctl --user restart pokachy.service
+pokachy version
+```
+
+The installer replaces the local binary and service unit but preserves your local session. To uninstall, sign out and stop the service, then remove the installed files. Logout clears this computer's credentials and offline cached state; removing `~/.config/pokachy` removes any remaining local client files. Use account settings to revoke other devices.
+
+```sh
+pokachy logout
+systemctl --user disable --now pokachy.service
+rm -f ~/.local/bin/pokachy ~/.config/systemd/user/pokachy.service ~/.local/share/icons/hicolor/scalable/apps/pokachy.svg
+rm -rf ~/.config/pokachy
+systemctl --user daemon-reload
+```
+
 ## Say hey
+
+Account settings include device revocation. The launch-readiness update adds [account deletion](https://pokachy.com/delete-account.html), [privacy information](https://pokachy.com/privacy.html), and [support](https://pokachy.com/support.html); these pages require deploying the updated Worker. Deletion requires a recent sign-in, an email code, and explicit confirmation. Local uninstall does not delete your server account.
 
 ```sh
 pokachy friends add @friend
@@ -86,4 +112,4 @@ The Workers-runtime tests cover authentication, friendship consent, concurrent/i
 | `packaging/`, `scripts/` | Installation, secrets setup, releases |
 | `.github/workflows/` | Checks and version-tag releases |
 
-See [architecture](docs/architecture.md) and [deployment](docs/deployment.md). Licensed under [MIT](LICENSE).
+See [architecture](docs/architecture.md), [deployment](docs/deployment.md), and [launch readiness](docs/launch-readiness.md). Licensed under [MIT](LICENSE).

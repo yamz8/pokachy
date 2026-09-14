@@ -1,5 +1,19 @@
 # Pokachy handoff — 2026-09-09
 
+## Launch-readiness implementation — 2026-09-14
+
+Supersedes the old release-preparation status below: v0.1.5 is public from `2a94f7d`; production was last verified at `af2337a`. This change is prepared on `codex/public-launch-readiness`, with no production deployment or new release tag.
+
+- Added browser account deletion with a recent verified session, an independent email OTP, explicit confirmation, send/attempt limits, administrator protection, atomic active-data deletion, and live-socket revalidation. Device-session freshness alone was insufficient because an existing session can approve a new device; the independent OTP closes that gap.
+- Added privacy/support pages and hourly bounded cleanup of expired authentication records. History and reports stay until an involved account is deleted; recovery copies, email queues/provider logs, and offline caches have separate limitations documented publicly.
+- Added opt-in report pagination, resolve/reopen, unsuspend without session restoration, and case-insensitive unblock. Legacy report-list shape remains compatible.
+- Added a basic read-only GitHub smoke-monitor workflow, upgrade/uninstall instructions, moderation/appeal procedures, launch checklist, and disposable SQL recovery rehearsal. The monitoring schedule only becomes active after merge to default branch. Cloudflare inspection found no configured account alert policies or verified email-routing destinations. The owner chose the recommended `support@pokachy.com` direction but still needs to provide/verify a forwarding destination, and has no pilot participants yet.
+- Final `npm run verify` started `2026-09-14T04:22:58.244527+00:00`, completed with exit 0, and passed all seven stages, including 15 Worker tests, Go tests/vet, installer checks, and native CLI/daemon integration. The updated deletion tests cover wrong/missing OTP, rate caps, cascades, retained peer data, revoked tokens, and WebSocket closure. The production bundle dry run also passed; its existing `ADMIN_USER_IDS` var warning reflects the intentional production secret.
+- `python3 scripts/rehearse-recovery.py` completed with exit 0 at `2026-09-14T04:23:58.415220+00:00`, demonstrating resurrection of synthetic deleted data on restore, then safe re-deletion and session revocation with zero foreign-key violations. This is local SQLite evidence, not a Cloudflare rollback or Time Travel rehearsal.
+- Browser verification used the real updated Worker and disposable `/tmp/pokachy-launch-browser-db` data on port 8791. Signed-out deletion, local email onboarding, OTP-confirmed deletion success, and the 390px privacy layout were checked. The mobile privacy page had no horizontal overflow. Automatic approval review blocked the remaining support-page/browser diagnostics at the account usage limit; no workaround or production account action was used.
+
+Still needed before broad launch: review and guarded deployment, support forwarding and delivery test, alert recipients/configuration and notification test, hosted recovery drill, authorized disposable production moderation/deletion tests, pilot recruitment, and real ARM64 execution or explicit experimental labeling. See `docs/launch-readiness.md`.
+
 ## Session boundary
 
 This handoff began with CI/CD verification and now also records the completed Omarchy desktop installation and release validation. The owner prefers bounded Luna reviews and Terra implementation, with the primary agent responsible for integration, security, and final verification.

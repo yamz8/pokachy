@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Privacy — Pokachy</title><link rel="icon" href="/icon.png"><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header class="site-header"><a class="brand" href="/">pokachy</a><a href="/account">My account</a></header>
+<main class="document-main"><article class="card document-card">
+  <h1>Privacy and your data</h1>
+  <p>Pokachy is a small independent service maintained by <a href="https://github.com/yamz8">yamz8</a>. This page describes the data used by the service and the controls available to you.</p>
+  <h2>What we store</h2>
+  <p>Your email address, display name, handle, optional GitHub profile picture URL, account settings, friendships, blocks, and poke timestamps. We also store abuse reports and their review status. Pokes contain no message text.</p>
+  <p>Authentication records include sessions, IP addresses, browser/device descriptions, device approvals, and expiring verification records. Sign-in codes are hashed in the authentication database. A code and destination email are temporarily held in the email delivery queue. Linked GitHub credentials are encrypted in the database.</p>
+  <h2>Who can see it</h2>
+  <p>Your email is not included in friends’ API responses. People who interact with your handle can see your handle, display name, and supported profile picture. Accepted friends see their shared poke history and presence. The service maintainer can access service data to operate Pokachy and investigate reports.</p>
+  <p>Cloudflare hosts the service, stores its data, delivers sign-in emails, and provides Turnstile bot verification. GitHub handles optional GitHub sign-in and serves profile pictures directly to your browser or desktop; loading a picture sends a request to GitHub. Your email provider receives sign-in emails. Pokachy does not include advertising or third-party analytics scripts.</p>
+  <h2>How long it stays</h2>
+  <p>Account data and poke history stay while the account exists; dismissing a poke marks it resolved rather than deleting its history. Removing a friendship hides shared history but does not erase it. Reports, including resolved reports, stay until an involved account is deleted.</p>
+  <p>Expired sessions, verification records, and device codes are eligible for hourly cleanup. Cleanup processes up to 1,000 records per category per run, so a backlog or outage can delay removal. Authentication rate-limit rows become eligible after one day of inactivity. Expired codes are rejected even before cleanup.</p>
+  <p>Cloudflare recovery history can retain database data for up to 30 days after deletion. Operational logs, provider security records, and queued or failed email jobs follow their configured provider retention; account deletion does not selectively erase those records. We avoid adding codes, tokens, or email bodies to application logs.</p>
+  <h2>Your controls</h2>
+  <p>Review and revoke devices from <a href="/account">your account</a>. You can block or report a person with the CLI, and <a href="/delete-account.html">permanently delete your account</a> after a recent sign-in and confirmation with an email code. Deletion removes the active account and its associated friendships, history, blocks, and reports, and revokes all sessions.</p>
+  <p>Each desktop keeps credentials and a recent state cache. Run <code>pokachy logout</code> on each computer to clear them. Offline devices, other people’s saved copies, and desktop notification history cannot be erased remotely.</p>
+  <p>For questions or help, see <a href="/support.html">support</a>. Do not post private account details or credentials in public issues.</p>
+</article></main>
+</body></html>
