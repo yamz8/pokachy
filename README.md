@@ -1,8 +1,19 @@
-# Pokachy
+<p align="center">
+  <img src="server/public/pokachy-parrot-web.png" width="128" alt="Pokachy pixel parrot">
+</p>
 
-A tiny way to say hey to your Linux friends. Poke from your terminal or Omarchy bar and receive desktop notifications.
+<h1 align="center">Pokachy</h1>
 
-**[pokachy.com](https://pokachy.com)** · **[Download](https://github.com/yamz8/pokachy/releases/latest)** · **[Omarchy panel](docs/omarchy.md)**
+<p align="center">
+  <strong>Poke. That's it.</strong><br>
+  A tiny signal between Linux friends. No feed, no chat, no noise.
+</p>
+
+<p align="center">
+  <strong><a href="https://pokachy.com">pokachy.com</a></strong> ·
+  <strong><a href="https://github.com/yamz8/pokachy/releases/latest">Download</a></strong> ·
+  <strong><a href="docs/omarchy.md">Omarchy panel</a></strong>
+</p>
 
 ## Install
 
@@ -45,7 +56,7 @@ systemctl --user daemon-reload
 
 ## Say hey
 
-Account settings include device revocation. The launch-readiness update adds [account deletion](https://pokachy.com/delete-account.html), [privacy information](https://pokachy.com/privacy.html), and [support](https://pokachy.com/support.html); these pages require deploying the updated Worker. Deletion requires a recent sign-in, an email code, and explicit confirmation. Local uninstall does not delete your server account.
+Account settings include device revocation. You can also access [account deletion](https://pokachy.com/delete-account.html), [privacy information](https://pokachy.com/privacy.html), and [support](https://pokachy.com/support.html). Deletion requires a recent sign-in, an email code, and explicit confirmation. Local uninstall does not delete your server account.
 
 ```sh
 pokachy friends add @friend
