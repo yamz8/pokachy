@@ -58,15 +58,13 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    slotSize: Style.bar.statusSlot
     iconComponent: Component {
       Item {
-        readonly property real iconSize: Math.round(Math.min(width, height) * 0.75)
-
         BrandIcon {
+          compact: true
           anchors.centerIn: parent
-          width: parent.iconSize
-          height: parent.iconSize
+          width: parent.width
+          height: parent.height
           foreground: button.active && button.useActiveColor ? button.activeColor : button.foreground
           opacity: panelLoader.item && panelLoader.item.needsLogin ? 0.55 : 1.0
         }
