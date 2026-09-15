@@ -3,104 +3,79 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10120f">
-  <meta name="description" content="Pokachy is a tiny way to say hey to your Linux friends—from your terminal or Omarchy bar.">
-  <title>Pokachy — send a tiny signal</title>
-  <link rel="icon" href="/icon.png" type="image/png">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Pokachy is a tiny Linux-native signal between friends. No feed, no chat, no noise.">
+  <title>Pokachy — poke, that’s it</title>
+  <link rel="icon" href="/pokachy-parrot-web.png" type="image/png">
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="/" aria-label="Pokachy home">
-      <img class="brand-mark" src="/pokachy-mark.png" alt="">
+      <img class="brand-mark" src="/pokachy-parrot-web.png" alt="">
       <span class="brand-name">pokachy</span>
-      <span class="version">0.1.5</span>
     </a>
     <nav class="header-links" aria-label="Project links">
-      <span class="status-note"><span class="status-dot"></span>linux native</span>
-      <a href="https://github.com/yamz8/pokachy#readme">docs</a>
-      <a href="https://github.com/yamz8/pokachy">source ↗</a>
+      <a href="https://github.com/yamz8/pokachy/releases/latest">Get Pokachy</a>
+      <a href="https://github.com/yamz8/pokachy">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
   </header>
 
-  <main>
+  <main class="home-main">
     <section class="intro" aria-labelledby="intro-title">
-      <div class="eyebrow"><span>01</span> A TINY DESKTOP SIGNAL</div>
-      <h1 id="intro-title">Say hey.<br><em>No words needed.</em></h1>
-      <p class="lede">Poke a Linux friend from your terminal or Omarchy bar. They’ll feel the nudge right on their desktop.</p>
-
-      <div class="terminal" aria-label="Example Pokachy exchange">
-        <div class="terminal-top">
-          <div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div>
-          <span>pokachy / bash</span>
-          <span class="terminal-online">online</span>
-        </div>
-        <div class="terminal-body">
-          <div class="command-line"><span class="prompt">~</span><span class="dollar">$</span> pokachy poke @maya</div>
-          <div class="delivery">↳ sent. now you wait.</div>
-          <div class="terminal-notice">
-            <span class="poke-glyph" aria-hidden="true">☞</span>
-            <div><strong>Maya poked you back</strong><small>just now · from their desktop</small></div>
-            <span class="reply-dot" aria-hidden="true"></span>
-          </div>
-          <div class="command-line"><span class="prompt">~</span><span class="dollar">$</span> <span class="cursor" aria-hidden="true"></span></div>
-        </div>
-      </div>
-
-      <div class="principles" aria-label="Pokachy principles">
-        <span><b>01</b> friends only</span>
-        <span><b>02</b> no feed</span>
-        <span><b>03</b> linux first</span>
-      </div>
-      <div class="intro-actions">
-        <a class="download-link" href="https://github.com/yamz8/pokachy/releases/latest">Download for Linux <span>↓</span></a>
-        <a class="quiet-link" href="https://github.com/yamz8/pokachy#readme">Install guide ↗</a>
+      <div class="intro-copy">
+        <p class="eyebrow">Linux native · friends only</p>
+        <h1 id="intro-title">Poke.<br><span>That’s it.</span></h1>
+        <p class="lede">A tiny signal between friends. No feed, no chat, no noise.</p>
       </div>
     </section>
 
     <section class="card" aria-labelledby="card-title" aria-describedby="card-description">
-      <div class="card-topline"><span>POKACHY ACCOUNT</span><span class="card-index">P/01</span></div>
-      <h2 id="card-title">Come say hey.</h2>
-      <p id="card-description" class="muted">Sign in or create an account. No password required.</p>
-      <div id="loading" class="loading"><span></span>Connecting…</div>
+      <div class="card-brand" aria-hidden="true">
+        <img src="/pokachy-parrot-web.png" alt="">
+        <span>pokachy</span>
+      </div>
+      <h2 id="card-title">Sign in</h2>
+      <p id="card-description" class="muted">Use email or GitHub. No password needed.</p>
+      <div id="loading" class="loading"><span></span>Connecting</div>
 
       <div id="auth" hidden>
         <button id="github" class="button secondary provider-button full" hidden><span>Continue with GitHub</span><b>↗</b></button>
-        <div id="divider" class="divider"><span>or use an email code</span></div>
+        <div id="divider" class="divider"><span>or</span></div>
         <form id="email-form">
-          <label for="email">Email address <span>never shown publicly</span></label>
+          <label for="email">Email <span>stays private</span></label>
           <input id="email" type="email" autocomplete="email" inputmode="email" spellcheck="false" placeholder="you@example.com" aria-describedby="auth-help" required maxlength="254">
           <div id="turnstile-container"></div>
-          <button class="button full" type="submit"><span>Email me a sign-in code</span><b>→</b></button>
+          <button class="button full" type="submit"><span>Send sign-in code</span><b>→</b></button>
         </form>
         <form id="code-form" class="code-form" hidden>
           <label for="code">Sign-in code <span>6 digits</span></label>
           <input id="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" enterkeyhint="done" spellcheck="false" pattern="[0-9]{6}" maxlength="6" aria-describedby="card-description auth-help" required placeholder="000000">
-          <button class="button full" type="submit"><span>Verify and continue</span><b>→</b></button>
-          <button id="change-email" type="button" class="text-button change-email">← Use a different email</button>
+          <button class="button full" type="submit"><span>Continue</span><b>→</b></button>
+          <button id="change-email" type="button" class="text-button change-email">Use a different email</button>
         </form>
-        <p id="auth-help" class="fine auth-help"><span class="auth-help-mark" aria-hidden="true">✳</span><span id="auth-help-text">New here? Signing in creates your account automatically.</span></p>
+        <p id="auth-help" class="fine auth-help"><span class="auth-help-mark" aria-hidden="true">+</span><span id="auth-help-text">New account? We’ll create it when you sign in.</span></p>
       </div>
 
       <form id="profile-form" hidden>
         <label for="handle">Your handle <span>public</span></label>
         <div class="handle-input"><span aria-hidden="true">@</span><input id="handle" pattern="[a-z0-9][a-z0-9_]{2,23}" minlength="3" maxlength="24" required autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="handle-help" placeholder="yourname"></div>
         <p id="handle-help" class="fine handle-help">3–24 lowercase letters, numbers, or underscores.</p>
-        <button class="button full" type="submit"><span>Claim this handle</span><b>→</b></button>
+        <button class="button full" type="submit"><span>Claim handle</span><b>→</b></button>
       </form>
 
       <div id="approve" hidden>
         <div class="device-code-label"><span>Terminal code</span><span>Pokachy CLI</span></div>
         <output class="device-code" id="device-code" aria-label="Device confirmation code"></output>
-        <p class="device-help"><span aria-hidden="true">✳</span><span>Only continue if you started this request on your own computer.</span></p>
-        <button id="approve-button" class="button full"><span>Yes, connect this desktop</span><b>→</b></button>
-        <button id="deny-button" class="text-button deny-device">No, deny this request</button>
+        <p class="device-help"><span aria-hidden="true">+</span><span>Only continue if you started this request on your own computer.</span></p>
+        <button id="approve-button" class="button full"><span>Connect this desktop</span><b>→</b></button>
+        <button id="deny-button" class="text-button deny-device">Deny request</button>
       </div>
 
       <div id="connected" hidden>
         <div class="connected-identity">
-          <div class="connected-badge"><span></span>Account ready</div>
+          <div class="connected-badge"><span></span>Ready</div>
           <div class="profile-identity">
             <span class="profile-avatar"><span id="profile-initial" aria-hidden="true">?</span><img id="profile-picture" alt="" referrerpolicy="no-referrer" hidden></span>
             <strong id="identity"></strong>
@@ -111,7 +86,7 @@
           <code class="command"><span>$</span> pokachy friends add @friend</code>
           <code class="command"><span>$</span> pokachy poke @friend</code>
         </div>
-        <button id="link-github" class="button secondary full" hidden><span>Link GitHub to this account</span><b>↗</b></button>
+        <button id="link-github" class="button secondary full" hidden><span>Link GitHub</span><b>↗</b></button>
         <button id="sessions-toggle" type="button" class="session-toggle" aria-expanded="false" aria-controls="sessions"><span><strong>Signed-in devices</strong><small>Review and revoke access</small></span><b id="sessions-icon">+</b></button>
         <div id="sessions" class="sessions" aria-live="polite" hidden></div>
       </div>
@@ -119,17 +94,15 @@
       <div id="fatal-actions" hidden>
         <button id="recovery-button" class="button secondary full"><span id="recovery-label">Try again</span><b id="recovery-icon">↻</b></button>
       </div>
-      <button id="signout" class="text-button account-signout" hidden>Sign out of this browser</button>
+      <button id="signout" class="text-button account-signout" hidden>Sign out</button>
       <div id="notice" role="status" aria-live="polite"></div>
       <div id="local" class="local" hidden><span>LOCAL PREVIEW</span> Emails stay on this computer <button id="local-code" class="text-button" hidden>Fill the development code</button></div>
-      <div class="card-foot"><span>PRIVATE BY DESIGN</span><span>NO FEED · NO NOISE</span></div>
     </section>
   </main>
 
   <footer>
-    <span>Small gesture. Real person.</span>
-    <span><a href="/privacy.html">Privacy</a> · <a href="/support.html">Support</a> · <a href="/delete-account.html">Delete account</a></span>
-    <span>CLI + OMARCHY <i>✳</i></span>
+    <span>© Pokachy</span>
+    <span><a href="/privacy.html">Privacy</a><a href="/support.html">Support</a><a href="https://x.com/PokachyPoke">X ↗</a></span>
   </footer>
 </body>
 </html>
