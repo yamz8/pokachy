@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "com.pokachy.poke",
+  "name": "Pokachy",
+  "version": "0.1.6",
+  "author": "Pokachy",
+  "description": "A tiny way to say hey to your Linux friends. Requires the pokachy CLI.",
+  "kinds": ["bar-widget"],
+  "entryPoints": {"barWidget": "BarWidget.qml"},
+  "barWidget": {
+    "displayName": "Pokachy",
+    "category": "Social",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

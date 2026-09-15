@@ -61,5 +61,6 @@ unit_path=$(printf '%s' "$binary_destination" | sed 's/\\/\\\\/g; s/"/\\"/g; s/%
 } | install -m 0644 /dev/stdin "$config_root/systemd/user/pokachy.service"
 
 printf 'Installed Pokachy to %s\n' "$install_prefix/bin/pokachy"
-printf '\nNext, connect this computer:\n  %s/bin/pokachy init\n' "$install_prefix"
-printf '\nThen enable notifications:\n  systemctl --user daemon-reload\n  systemctl --user enable --now pokachy.service\n'
+if [ "${POKACHY_INSTALL_SKIP_NEXT:-}" != 1 ]; then
+  printf '\nNext, connect this computer and finish desktop setup:\n  %s/bin/pokachy init\n' "$install_prefix"
+fi

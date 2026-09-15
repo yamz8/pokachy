@@ -357,6 +357,7 @@ app.all("/api/*",c=>error(c,"Not found",404));
 app.get("*",c=>{
   const url=new URL(c.req.url);
   if(["/activate","/account"].includes(url.pathname)) url.pathname="/index.html";
+  if(url.pathname==="/install") url.pathname="/install.html";
   return c.env.ASSETS.fetch(new Request(url,c.req.raw));
 });
 app.onError((err,c)=>{

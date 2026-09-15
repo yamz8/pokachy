@@ -95,7 +95,7 @@ After restoring a database, previously deleted accounts and revoked sessions may
 
 ## Releases
 
-Keep root/server package versions, CLI version, and manifest version aligned. Pushes and pull requests run CI. A `v0.1.0`-style tag validates and publishes Linux amd64/arm64 archives plus `SHA256SUMS`. A tag does not deploy the Worker or migrate production data.
+Keep root/server package versions, CLI version, and both Omarchy manifest versions aligned. Pushes and pull requests run CI. A `v0.1.0`-style tag validates and publishes the stable-name `pokachy_linux_amd64.tar.gz` and `pokachy_linux_arm64.tar.gz` archives, the bootstrap `install.sh`, and `SHA256SUMS`. It also publishes the matching `plugins/omarchy/` snapshot to `yamz8/pokachy-omarchy`; configure the `OMARCHY_PLUGIN_TOKEN` repository secret with contents access to that repository before tagging. The workflow creates a private draft release, publishes the companion plugin, and only then makes the main release public. A tag does not deploy the Worker or migrate production data.
 
 Local packaging: `scripts/package-release.sh v0.1.0`. Archives contain the CLI, installer, user service, and plugin. Omarchy can also install the Git repository directly.
 

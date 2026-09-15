@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -29,6 +31,11 @@ import (
 )
 
 const version = "0.1.6"
+
+const omarchyPluginURL = "https://github.com/yamz8/pokachy-omarchy.git"
+const bootstrapInstallerURL = "https://github.com/yamz8/pokachy/releases/latest/download/install.sh"
+const bootstrapChecksumsURL = "https://github.com/yamz8/pokachy/releases/latest/download/SHA256SUMS"
+const omarchyPluginID = "com.pokachy.poke"
 
 type Config struct {
 	Server string `json:"server"`
@@ -343,7 +350,7 @@ func outputJSON(v any) { b, _ := json.Marshal(v); fmt.Println(string(b)) }
 func help() {
 	fmt.Print(`Pokachy — a little nudge for your Linux friends
 
-  pokachy init [--server https://pokachy.com] [--no-browser]
+  pokachy init [--server https://pokachy.com] [--no-browser] [--no-desktop]
   pokachy poke @friend
   pokachy friends [add|accept|remove] @friend
   pokachy inbox
@@ -357,6 +364,9 @@ func help() {
   pokachy status [--json]         Read the local companion status
   pokachy watch --json            Stream local status changes
   pokachy daemon                 Receive desktop notifications
+  pokachy doctor                 Check local companion health
+  pokachy update [--yes]         Update this computer from the public installer
+  pokachy uninstall [--yes]      Remove this computer (does not delete your account)
   pokachy logout
   pokachy version
 
@@ -386,6 +396,15 @@ func run(args []string) error {
 	}
 	if args[0] == "init" {
 		return onboarding(args[1:])
+	}
+	if args[0] == "doctor" {
+		return doctor()
+	}
+	if args[0] == "update" {
+		return update(args[1:])
+	}
+	if args[0] == "uninstall" {
+		return uninstall(args[1:])
 	}
 	if args[0] == "status" || args[0] == "watch" {
 		return status(args[0] == "watch", asJSON)
@@ -587,6 +606,94 @@ func openBrowser(target string) error {
 	}
 	return nil
 }
+
+// onboardingEnvironment keeps desktop integration separate from account
+// activation. It makes the best-effort local setup easy to exercise without
+// starting a service or changing a user's desktop during tests.
+type onboardingEnvironment struct {
+	lookPath  func(string) (string, error)
+	run       func(context.Context, string, ...string) error
+	runOutput func(context.Context, string, ...string) ([]byte, error)
+	output    io.Writer
+}
+
+func runInteractiveCommand(ctx context.Context, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	// Omarchy deliberately asks the user to approve third-party plugin code.
+	// Preserve that interaction rather than using a non-interactive flag.
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+var defaultOnboardingEnvironment = onboardingEnvironment{
+	lookPath:  exec.LookPath,
+	run:       runInteractiveCommand,
+	runOutput: runCommandOutput,
+	output:    os.Stdout,
+}
+
+// configureDesktop is deliberately best effort: a connected account remains
+// useful even if the host has no systemd, notifications, or Omarchy.
+func configureDesktop(ctx context.Context, env onboardingEnvironment) {
+	if _, err := env.lookPath("systemctl"); err != nil {
+		fmt.Fprintln(env.output, "Systemd user services are unavailable. Run `pokachy daemon` in a terminal to receive notifications.")
+	} else if err := env.run(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
+		fmt.Fprintln(env.output, "Could not reload systemd user services. Run `systemctl --user daemon-reload` after fixing your user systemd session.")
+	} else if err := env.run(ctx, "systemctl", "--user", "enable", "--now", "pokachy.service"); err != nil {
+		fmt.Fprintln(env.output, "Could not start Pokachy notifications. Run `systemctl --user enable --now pokachy.service` after checking the installed service.")
+	} else {
+		fmt.Fprintln(env.output, "Notifications are running.")
+	}
+
+	if _, err := env.lookPath("notify-send"); err != nil {
+		fmt.Fprintln(env.output, "Desktop notifications need `notify-send` (libnotify) and a compatible notification service.")
+	}
+
+	if _, err := env.lookPath("omarchy"); err != nil {
+		return
+	}
+	if env.runOutput != nil {
+		if data, err := env.runOutput(ctx, "omarchy", "plugin", "list", "--json"); err == nil {
+			var plugins []omarchyPlugin
+			if json.Unmarshal(data, &plugins) == nil {
+				for _, plugin := range plugins {
+					if plugin.ID != omarchyPluginID {
+						continue
+					}
+					if plugin.Enabled {
+						fmt.Fprintln(env.output, "Pokachy is already in your Omarchy bar.")
+						return
+					}
+					if err := env.run(ctx, "omarchy", "plugin", "enable", omarchyPluginID); err != nil {
+						fmt.Fprintln(env.output, "Pokachy's Omarchy panel is installed but could not be enabled. Try: omarchy plugin enable "+omarchyPluginID)
+					} else {
+						fmt.Fprintln(env.output, "Pokachy is in your Omarchy bar.")
+					}
+					return
+				}
+			}
+		}
+	}
+	fmt.Fprintln(env.output, "Omarchy detected. Its plugin installer will ask whether to add Pokachy to your bar.")
+	if err := env.run(ctx, "omarchy", "plugin", "add", omarchyPluginURL, "--enable"); err != nil {
+		fmt.Fprintln(env.output, "Pokachy's Omarchy panel was not added. You can try later with: omarchy plugin add "+omarchyPluginURL+" --enable")
+		return
+	}
+	fmt.Fprintln(env.output, "Pokachy is in your Omarchy bar.")
+}
+
+func completeOnboarding(ctx context.Context, handle string, resumed bool) {
+	if resumed {
+		fmt.Printf("Already connected as @%s. Checking desktop integration...\n", safe(handle))
+	} else {
+		fmt.Printf("Connected as @%s. Checking desktop integration...\n", safe(handle))
+	}
+	configureDesktop(ctx, defaultOnboardingEnvironment)
+	fmt.Println("Next: pokachy friends add @friend")
+}
+
 func gitValue(key string) string {
 	out, err := exec.Command("git", "config", "--global", "--get", key).Output()
 	if err != nil {
@@ -609,6 +716,7 @@ func onboarding(args []string) error {
 	flags := flag.NewFlagSet("init", flag.ContinueOnError)
 	server := flags.String("server", "https://pokachy.com", "Pokachy server origin")
 	noBrowser := flags.Bool("no-browser", false, "Print the URL instead of opening it")
+	noDesktop := flags.Bool("no-desktop", false, "Skip systemd, notification, and Omarchy setup")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -616,8 +724,27 @@ func onboarding(args []string) error {
 	if err := validServer(*server); err != nil {
 		return err
 	}
-	if _, err := os.Stat(filepath.Join(configDir(), "credentials.json")); err == nil {
-		return errors.New("already connected; use 'pokachy logout' before connecting a different account")
+	credentialsPath := filepath.Join(configDir(), "credentials.json")
+	if _, err := os.Stat(credentialsPath); err == nil {
+		c, err := loadClient()
+		if err != nil {
+			return fmt.Errorf("could not resume the stored device session: %w", err)
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		s, err := c.sync(ctx)
+		if err != nil {
+			return fmt.Errorf("could not verify the stored device session; run 'pokachy logout' before connecting another account: %w", err)
+		}
+		if *noDesktop {
+			fmt.Printf("Already connected as @%s. Desktop integration skipped.\n", safe(s.Me.Handle))
+			fmt.Println("Next: pokachy friends add @friend")
+		} else {
+			completeOnboarding(ctx, s.Me.Handle, true)
+		}
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	c := &Client{Config: Config{Server: *server}, HTTP: &http.Client{Timeout: 20 * time.Second}, Dir: configDir()}
 	name, email := gitValue("user.name"), gitValue("user.email")
@@ -700,12 +827,427 @@ func onboarding(args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("\nConnected as @%s. Try: pokachy friends add @friend\n", safe(s.Me.Handle))
-		fmt.Println("Start notifications with: systemctl --user enable --now pokachy.service")
+		fmt.Println()
+		if *noDesktop {
+			fmt.Printf("Connected as @%s. Desktop integration skipped.\n", safe(s.Me.Handle))
+			fmt.Println("Next: pokachy friends add @friend")
+		} else {
+			completeOnboarding(ctx, s.Me.Handle, false)
+		}
 		return nil
 	}
 	return errors.New("device request expired; run pokachy init again")
 }
+
+type maintenanceEnvironment struct {
+	lookPath      func(string) (string, error)
+	run           func(context.Context, string, ...string) error
+	runOutput     func(context.Context, string, ...string) ([]byte, error)
+	input         io.Reader
+	output        io.Writer
+	createTemp    func(string, string) (*os.File, error)
+	download      func(context.Context, string, string) error
+	chmod         func(string, os.FileMode) error
+	remove        func(string) error
+	configDir     func() string
+	userConfigDir func() string
+	installPrefix func() string
+}
+
+func runCommandOutput(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return exec.CommandContext(ctx, name, args...).Output()
+}
+
+func userConfigDir() string {
+	if p := os.Getenv("XDG_CONFIG_HOME"); p != "" {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config")
+}
+
+func installPrefix() string {
+	if p := os.Getenv("POKACHY_INSTALL_PREFIX"); p != "" {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".local")
+}
+
+func downloadBootstrapInstaller(ctx context.Context, source, destination string) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(request *http.Request, via []*http.Request) error {
+		if len(via) >= 5 || request.URL.Scheme != "https" {
+			return errors.New("unsafe installer redirect")
+		}
+		allowed := map[string]bool{
+			"github.com": true, "objects.githubusercontent.com": true, "release-assets.githubusercontent.com": true,
+		}
+		if !allowed[strings.ToLower(request.URL.Hostname())] {
+			return errors.New("installer redirected to an untrusted host")
+		}
+		return nil
+	}}
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("could not download the Pokachy installer: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("could not download the Pokachy installer: unexpected HTTP status %d", response.StatusCode)
+	}
+	file, err := os.OpenFile(destination, os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+	limited := &io.LimitedReader{R: response.Body, N: (1 << 20) + 1}
+	written, err := io.Copy(file, limited)
+	if err != nil {
+		file.Close()
+		return err
+	}
+	if written > 1<<20 {
+		file.Close()
+		return errors.New("downloaded Pokachy installer is unexpectedly large")
+	}
+	return file.Close()
+}
+
+var defaultMaintenanceEnvironment = maintenanceEnvironment{
+	lookPath:      exec.LookPath,
+	run:           runInteractiveCommand,
+	runOutput:     runCommandOutput,
+	input:         os.Stdin,
+	output:        os.Stdout,
+	createTemp:    os.CreateTemp,
+	download:      downloadBootstrapInstaller,
+	chmod:         os.Chmod,
+	remove:        os.Remove,
+	configDir:     configDir,
+	userConfigDir: userConfigDir,
+	installPrefix: installPrefix,
+}
+
+func verifyReleaseFile(path, checksumsPath, name string) error {
+	checksums, err := os.ReadFile(checksumsPath)
+	if err != nil {
+		return err
+	}
+	wanted := ""
+	for _, line := range strings.Split(string(checksums), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && strings.TrimPrefix(fields[1], "*") == name {
+			if wanted != "" {
+				return fmt.Errorf("release checksums list %s more than once", name)
+			}
+			wanted = strings.ToLower(fields[0])
+		}
+	}
+	if len(wanted) != sha256.Size*2 {
+		return fmt.Errorf("release checksums do not contain a valid %s digest", name)
+	}
+	if _, err := hex.DecodeString(wanted); err != nil {
+		return fmt.Errorf("release checksum for %s is invalid", name)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	actual := sha256.Sum256(contents)
+	if hex.EncodeToString(actual[:]) != wanted {
+		return fmt.Errorf("release checksum verification failed for %s", name)
+	}
+	return nil
+}
+
+type omarchyPlugin struct {
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
+}
+
+// omarchyPluginStatus only asks Omarchy's plugin manager. It never reads or
+// edits Omarchy configuration directly, so it is safe for doctor and gives
+// update/uninstall a conservative answer when the shell is not running.
+func omarchyPluginStatus(ctx context.Context, env maintenanceEnvironment) (installed, enabled, known bool) {
+	if _, err := env.lookPath("omarchy"); err != nil {
+		return false, false, true
+	}
+	data, err := env.runOutput(ctx, "omarchy", "plugin", "list", "--json")
+	if err != nil {
+		return false, false, false
+	}
+	var plugins []omarchyPlugin
+	if err := json.Unmarshal(data, &plugins); err != nil {
+		return false, false, false
+	}
+	for _, plugin := range plugins {
+		if plugin.ID == omarchyPluginID {
+			return true, plugin.Enabled, true
+		}
+	}
+	return false, false, true
+}
+
+func doctor() error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return doctorWithEnvironment(ctx, defaultMaintenanceEnvironment)
+}
+
+// doctorWithEnvironment is intentionally read-only. It avoids Client.sync,
+// which updates the local cache, and instead makes one authenticated state
+// request only when local credentials are valid.
+func doctorWithEnvironment(ctx context.Context, env maintenanceEnvironment) error {
+	issues := false
+	fmt.Fprintln(env.output, "Pokachy doctor")
+	fmt.Fprintf(env.output, "Version: %s\nArchitecture: %s/%s\nConfig: %s\n", version, runtime.GOOS, runtime.GOARCH, env.configDir())
+
+	if c, err := loadClient(); err != nil {
+		issues = true
+		fmt.Fprintln(env.output, "Account: not connected — run `pokachy init`")
+	} else {
+		var state State
+		if err := c.request(ctx, http.MethodGet, "/api/state", nil, &state, ""); err != nil {
+			issues = true
+			fmt.Fprintln(env.output, "Server: unreachable — "+safe(err.Error()))
+		} else if state.Me.Handle != "" {
+			fmt.Fprintln(env.output, "Account: connected\nServer: reachable as @"+safe(state.Me.Handle))
+		} else {
+			fmt.Fprintln(env.output, "Account: connected\nServer: reachable")
+		}
+	}
+
+	if _, err := env.lookPath("systemctl"); err != nil {
+		issues = true
+		fmt.Fprintln(env.output, "Systemd user service: unavailable — run `pokachy daemon` in a terminal instead")
+	} else {
+		enabled := env.run(ctx, "systemctl", "--user", "is-enabled", "--quiet", "pokachy.service") == nil
+		active := env.run(ctx, "systemctl", "--user", "is-active", "--quiet", "pokachy.service") == nil
+		if enabled && active {
+			fmt.Fprintln(env.output, "Systemd user service: enabled and running")
+		} else {
+			issues = true
+			fmt.Fprintln(env.output, "Systemd user service: needs attention — run `systemctl --user enable --now pokachy.service`")
+		}
+	}
+
+	if _, err := env.lookPath("notify-send"); err != nil {
+		issues = true
+		fmt.Fprintln(env.output, "Notifications: `notify-send` is missing (install libnotify)")
+	} else {
+		fmt.Fprintln(env.output, "Notifications: notify-send available")
+	}
+
+	if _, err := env.lookPath("omarchy"); err != nil {
+		fmt.Fprintln(env.output, "Omarchy: not detected")
+	} else {
+		fmt.Fprintln(env.output, "Omarchy: detected")
+		installed, enabled, known := omarchyPluginStatus(ctx, env)
+		switch {
+		case !known:
+			fmt.Fprintln(env.output, "Omarchy plugin: state unavailable — start Omarchy shell, then run `omarchy plugin list --json`")
+		case !installed:
+			fmt.Fprintln(env.output, "Omarchy plugin: not installed — run `omarchy plugin add "+omarchyPluginURL+" --enable`")
+		case !enabled:
+			issues = true
+			fmt.Fprintln(env.output, "Omarchy plugin: installed but disabled — run `omarchy plugin enable "+omarchyPluginID+"`")
+		default:
+			fmt.Fprintln(env.output, "Omarchy plugin: installed and enabled")
+		}
+	}
+
+	if issues {
+		return errors.New("doctor found checks that need attention")
+	}
+	return nil
+}
+
+func confirmDefaultNo(input io.Reader, output io.Writer, prompt string) bool {
+	fmt.Fprint(output, prompt)
+	scanner := bufio.NewScanner(input)
+	if !scanner.Scan() {
+		return false
+	}
+	answer := strings.ToLower(strings.TrimSpace(scanner.Text()))
+	return answer == "y" || answer == "yes"
+}
+
+func update(args []string) error {
+	flags := flag.NewFlagSet("update", flag.ContinueOnError)
+	yes := flags.Bool("yes", false, "Run the reviewed installer without another prompt")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("use update [--yes]")
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return updateWithEnvironment(ctx, *yes, defaultMaintenanceEnvironment)
+}
+
+func updateWithEnvironment(ctx context.Context, yes bool, env maintenanceEnvironment) error {
+	if !yes && !confirmDefaultNo(env.input, env.output, "Update Pokachy on this computer using "+bootstrapInstallerURL+"? [y/N] ") {
+		fmt.Fprintln(env.output, "Update cancelled.")
+		return nil
+	}
+	installer, err := env.createTemp("", "pokachy-install-*")
+	if err != nil {
+		return err
+	}
+	installerPath := installer.Name()
+	if err := installer.Close(); err != nil {
+		env.remove(installerPath)
+		return err
+	}
+	defer env.remove(installerPath)
+	checksums, err := env.createTemp("", "pokachy-checksums-*")
+	if err != nil {
+		return err
+	}
+	checksumsPath := checksums.Name()
+	if err := checksums.Close(); err != nil {
+		env.remove(checksumsPath)
+		return err
+	}
+	defer env.remove(checksumsPath)
+	fmt.Fprintln(env.output, "Downloading and verifying the public installer before execution.")
+	if err := env.download(ctx, bootstrapInstallerURL, installerPath); err != nil {
+		return err
+	}
+	if err := env.download(ctx, bootstrapChecksumsURL, checksumsPath); err != nil {
+		return err
+	}
+	if err := verifyReleaseFile(installerPath, checksumsPath, "install.sh"); err != nil {
+		return err
+	}
+	if err := env.chmod(installerPath, 0700); err != nil {
+		return err
+	}
+	if err := env.run(ctx, "bash", installerPath, "--update"); err != nil {
+		return fmt.Errorf("Pokachy installer failed: %w", err)
+	}
+	fmt.Fprintln(env.output, "Pokachy files updated; preserving your local session.")
+	if _, err := env.lookPath("systemctl"); err == nil {
+		if err := env.run(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
+			fmt.Fprintln(env.output, "Could not reload systemd user services; restart Pokachy manually after fixing systemd.")
+		} else if err := env.run(ctx, "systemctl", "--user", "restart", "pokachy.service"); err != nil {
+			fmt.Fprintln(env.output, "Could not restart Pokachy notifications; run `systemctl --user restart pokachy.service` after checking the service.")
+		} else {
+			fmt.Fprintln(env.output, "Notifications restarted.")
+		}
+	}
+	installed, _, known := omarchyPluginStatus(ctx, env)
+	if known && installed {
+		args := []string{"plugin", "update", omarchyPluginID}
+		if yes {
+			args = append(args, "--yes")
+		}
+		if err := env.run(ctx, "omarchy", args...); err != nil {
+			fmt.Fprintln(env.output, "Omarchy could not update the Pokachy bar plugin; try `omarchy plugin update "+omarchyPluginID+"`.")
+		} else {
+			fmt.Fprintln(env.output, "Omarchy bar plugin updated.")
+		}
+	}
+	return nil
+}
+
+func uninstall(args []string) error {
+	flags := flag.NewFlagSet("uninstall", flag.ContinueOnError)
+	yes := flags.Bool("yes", false, "Remove local Pokachy files without another prompt")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("use uninstall [--yes]")
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return uninstallWithEnvironment(ctx, *yes, defaultMaintenanceEnvironment)
+}
+
+func knownPokachyPaths(env maintenanceEnvironment) []string {
+	paths := []string{}
+	appendPath := func(root string, parts ...string) {
+		cleanRoot := filepath.Clean(root)
+		// Never turn a missing, relative, or root-level XDG value into a
+		// destructive target. The packaged installer also requires absolute
+		// configuration roots.
+		if !filepath.IsAbs(cleanRoot) || cleanRoot == string(filepath.Separator) {
+			return
+		}
+		paths = append(paths, filepath.Join(append([]string{cleanRoot}, parts...)...))
+	}
+	appendPath(env.userConfigDir(), "systemd", "user", "pokachy.service")
+	config := env.configDir()
+	cleanConfig := filepath.Clean(config)
+	// Credential cleanup is permitted only for a directory clearly dedicated
+	// to Pokachy. This prevents a hostile POKACHY_CONFIG_DIR from targeting a
+	// home or shared configuration directory.
+	if filepath.IsAbs(cleanConfig) && filepath.Base(cleanConfig) == "pokachy" {
+		for _, name := range []string{"credentials.json", "state.json", "notified.json", "daemon.lock"} {
+			appendPath(cleanConfig, name)
+		}
+		// os.Remove is deliberately non-recursive: unexpected files survive.
+		appendPath(cleanConfig)
+	}
+	appendPath(env.installPrefix(), "bin", "pokachy")
+	appendPath(env.installPrefix(), "share", "icons", "hicolor", "scalable", "apps", "pokachy.svg")
+	return paths
+}
+
+func uninstallWithEnvironment(ctx context.Context, yes bool, env maintenanceEnvironment) error {
+	if !yes && !confirmDefaultNo(env.input, env.output, "Remove Pokachy from this computer? This removes local files and credentials only; it does not delete your account. [y/N] ") {
+		fmt.Fprintln(env.output, "Uninstall cancelled. Your Pokachy account remains unchanged.")
+		return nil
+	}
+	fmt.Fprintln(env.output, "Removing local Pokachy files only. This does not delete your account.")
+
+	var failures []error
+	installed, _, known := omarchyPluginStatus(ctx, env)
+	if known && installed {
+		args := []string{"plugin", "remove", omarchyPluginID}
+		if yes {
+			args = append(args, "--yes")
+		}
+		if err := env.run(ctx, "omarchy", args...); err != nil {
+			failures = append(failures, fmt.Errorf("remove Omarchy plugin: %w", err))
+		}
+	} else if !known {
+		fmt.Fprintln(env.output, "Could not determine the Omarchy plugin state; no plugin files were removed directly.")
+	}
+
+	if _, err := env.lookPath("systemctl"); err == nil {
+		if err := env.run(ctx, "systemctl", "--user", "disable", "--now", "pokachy.service"); err != nil {
+			fmt.Fprintln(env.output, "Could not stop the Pokachy user service; continuing with local cleanup.")
+		}
+	}
+	for _, path := range knownPokachyPaths(env) {
+		if err := env.remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			failures = append(failures, fmt.Errorf("remove %s: %w", path, err))
+		}
+	}
+	if _, err := env.lookPath("systemctl"); err == nil {
+		if err := env.run(ctx, "systemctl", "--user", "daemon-reload"); err != nil {
+			fmt.Fprintln(env.output, "Could not reload systemd user services after cleanup.")
+		}
+	}
+	if len(failures) > 0 {
+		return errors.Join(failures...)
+	}
+	fmt.Fprintln(env.output, "Pokachy was removed from this computer. Your server account still exists; use account settings to revoke or delete it.")
+	return nil
+}
+
 func cached() (State, error) {
 	var s State
 	data, err := os.ReadFile(filepath.Join(configDir(), "state.json"))
