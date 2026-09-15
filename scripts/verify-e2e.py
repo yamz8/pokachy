@@ -268,7 +268,7 @@ def main() -> None:
         alice_browser = create_user(base, "clialice")
         cli_env = os.environ.copy()
         cli_env.update({"POKACHY_CONFIG_DIR": str(cli_dir), "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_NOSYSTEM": "1"})
-        init = launch([str(binary), "init", "--server", base, "--no-browser"], cwd=ROOT, env=cli_env,
+        init = launch([str(binary), "init", "--server", base, "--no-browser", "--no-desktop"], cwd=ROOT, env=cli_env,
                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         lines: queue.Queue[str] = queue.Queue()
         captured: list[str] = []

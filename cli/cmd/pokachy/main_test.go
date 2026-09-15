@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -202,6 +204,352 @@ func TestLogoutClearsRevokedLocalSession(t *testing.T) {
 	for _, name := range []string{"credentials.json", "state.json", "notified.json"} {
 		if _, err := os.Stat(filepath.Join(dir, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%s still exists or could not be checked: %v", name, err)
+		}
+	}
+}
+
+func TestOnboardingResumesAuthenticatedSession(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/auth/device/code" {
+			t.Fatal("init should not begin a new device flow for an existing session")
+		}
+		if r.URL.Path != "/api/state" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"me":{"handle":"already-here"}}`)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	t.Setenv("POKACHY_CONFIG_DIR", dir)
+	if err := save(filepath.Join(dir, "credentials.json"), Config{Server: server.URL, Token: "valid"}); err != nil {
+		t.Fatal(err)
+	}
+
+	original := defaultOnboardingEnvironment
+	t.Cleanup(func() { defaultOnboardingEnvironment = original })
+	defaultOnboardingEnvironment = onboardingEnvironment{}
+
+	if err := onboarding([]string{"--no-browser", "--no-desktop"}); err != nil {
+		t.Fatalf("resume init: %v", err)
+	}
+}
+
+func TestConfigureDesktopActivatesServiceAndUsesOmarchyConsent(t *testing.T) {
+	var output strings.Builder
+	var commands [][]string
+	env := onboardingEnvironment{
+		lookPath: func(name string) (string, error) {
+			switch name {
+			case "systemctl", "notify-send", "omarchy":
+				return "/mock/" + name, nil
+			default:
+				return "", errors.New("not installed")
+			}
+		},
+		run: func(_ context.Context, name string, args ...string) error {
+			commands = append(commands, append([]string{name}, args...))
+			return nil
+		},
+		output: &output,
+	}
+
+	configureDesktop(context.Background(), env)
+	want := [][]string{
+		{"systemctl", "--user", "daemon-reload"},
+		{"systemctl", "--user", "enable", "--now", "pokachy.service"},
+		{"omarchy", "plugin", "add", omarchyPluginURL, "--enable"},
+	}
+	if len(commands) != len(want) {
+		t.Fatalf("commands = %#v, want %#v", commands, want)
+	}
+	for i := range want {
+		if strings.Join(commands[i], "\x00") != strings.Join(want[i], "\x00") {
+			t.Errorf("command %d = %#v, want %#v", i, commands[i], want[i])
+		}
+	}
+	if got := output.String(); !strings.Contains(got, "Notifications are running.") || !strings.Contains(got, "Pokachy is in your Omarchy bar.") {
+		t.Fatalf("unexpected output: %q", got)
+	}
+}
+
+func TestConfigureDesktopHandlesMissingDesktopToolsAndDeclinedPlugin(t *testing.T) {
+	t.Run("missing tools", func(t *testing.T) {
+		var output strings.Builder
+		env := onboardingEnvironment{
+			lookPath: func(string) (string, error) { return "", errors.New("not installed") },
+			run: func(context.Context, string, ...string) error {
+				t.Fatal("no command should run when desktop tools are absent")
+				return nil
+			},
+			output: &output,
+		}
+		configureDesktop(context.Background(), env)
+		got := output.String()
+		if !strings.Contains(got, "Systemd user services are unavailable") || !strings.Contains(got, "Desktop notifications need `notify-send`") {
+			t.Fatalf("unexpected output: %q", got)
+		}
+	})
+
+	t.Run("native Omarchy installer declined or failed", func(t *testing.T) {
+		var output strings.Builder
+		var commands [][]string
+		env := onboardingEnvironment{
+			lookPath: func(name string) (string, error) {
+				if name == "omarchy" {
+					return "/mock/omarchy", nil
+				}
+				return "", errors.New("not installed")
+			},
+			run: func(_ context.Context, name string, args ...string) error {
+				commands = append(commands, append([]string{name}, args...))
+				return errors.New("declined")
+			},
+			output: &output,
+		}
+		configureDesktop(context.Background(), env)
+		if len(commands) != 1 || strings.Join(commands[0], " ") != "omarchy plugin add "+omarchyPluginURL+" --enable" {
+			t.Fatalf("native plugin installer command = %#v", commands)
+		}
+		if !strings.Contains(output.String(), "Pokachy's Omarchy panel was not added") {
+			t.Fatalf("unexpected output: %q", output.String())
+		}
+	})
+}
+
+func TestConfigureDesktopKeepsInstalledOmarchyPlugin(t *testing.T) {
+	var output strings.Builder
+	env := onboardingEnvironment{
+		lookPath: func(string) (string, error) { return "/mock/tool", nil },
+		run: func(_ context.Context, name string, args ...string) error {
+			if name == "systemctl" {
+				return nil
+			}
+			t.Fatalf("installed plugin should not run %s %v", name, args)
+			return nil
+		},
+		runOutput: func(_ context.Context, name string, args ...string) ([]byte, error) {
+			if name != "omarchy" || strings.Join(args, " ") != "plugin list --json" {
+				t.Fatalf("unexpected output command: %s %v", name, args)
+			}
+			return []byte(`[{"id":"com.pokachy.poke","enabled":true}]`), nil
+		},
+		output: &output,
+	}
+	configureDesktop(context.Background(), env)
+	if !strings.Contains(output.String(), "already in your Omarchy bar") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func testMaintenanceEnvironment(output io.Writer) maintenanceEnvironment {
+	return maintenanceEnvironment{
+		lookPath:      func(string) (string, error) { return "", errors.New("not installed") },
+		run:           func(context.Context, string, ...string) error { return nil },
+		runOutput:     func(context.Context, string, ...string) ([]byte, error) { return nil, errors.New("not installed") },
+		input:         strings.NewReader(""),
+		output:        output,
+		createTemp:    os.CreateTemp,
+		download:      func(context.Context, string, string) error { return nil },
+		chmod:         os.Chmod,
+		remove:        os.Remove,
+		configDir:     configDir,
+		userConfigDir: userConfigDir,
+		installPrefix: installPrefix,
+	}
+}
+
+func TestDoctorReportsHealthyLocalCompanion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/state" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"me":{"handle":"doctor"}}`)
+	}))
+	defer server.Close()
+	dir := t.TempDir()
+	t.Setenv("POKACHY_CONFIG_DIR", dir)
+	if err := save(filepath.Join(dir, "credentials.json"), Config{Server: server.URL, Token: "token"}); err != nil {
+		t.Fatal(err)
+	}
+
+	var output strings.Builder
+	env := testMaintenanceEnvironment(&output)
+	env.lookPath = func(name string) (string, error) {
+		switch name {
+		case "systemctl", "notify-send", "omarchy":
+			return "/mock/" + name, nil
+		default:
+			return "", errors.New("not installed")
+		}
+	}
+	env.runOutput = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name != "omarchy" || strings.Join(args, " ") != "plugin list --json" {
+			t.Fatalf("unexpected output command: %s %v", name, args)
+		}
+		return []byte(`[{"id":"com.pokachy.poke","enabled":true}]`), nil
+	}
+	if err := doctorWithEnvironment(context.Background(), env); err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	got := output.String()
+	for _, want := range []string{"Version: " + version, "Architecture: ", "Server: reachable as @doctor", "Systemd user service: enabled and running", "Notifications: notify-send available", "Omarchy plugin: installed and enabled"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("doctor output missing %q: %s", want, got)
+		}
+	}
+}
+
+func TestDoctorReturnsUsefulFailureForMissingRequirements(t *testing.T) {
+	t.Setenv("POKACHY_CONFIG_DIR", t.TempDir())
+	var output strings.Builder
+	env := testMaintenanceEnvironment(&output)
+	if err := doctorWithEnvironment(context.Background(), env); err == nil {
+		t.Fatal("doctor should fail when connection and desktop requirements are missing")
+	}
+	got := output.String()
+	for _, want := range []string{"Account: not connected", "Systemd user service: unavailable", "Notifications: `notify-send` is missing", "Omarchy: not detected"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("doctor output missing %q: %s", want, got)
+		}
+	}
+}
+
+func TestUpdateUsesTemporaryBootstrapInstallerAndRestartsIntegrations(t *testing.T) {
+	tmp := t.TempDir()
+	var output strings.Builder
+	var commands [][]string
+	var downloaded []string
+	installerContents := []byte("#!/bin/sh\n")
+	env := testMaintenanceEnvironment(&output)
+	env.lookPath = func(name string) (string, error) {
+		if name == "systemctl" || name == "omarchy" {
+			return "/mock/" + name, nil
+		}
+		return "", errors.New("not installed")
+	}
+	env.run = func(_ context.Context, name string, args ...string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	env.runOutput = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name != "omarchy" || strings.Join(args, " ") != "plugin list --json" {
+			t.Fatalf("unexpected output command: %s %v", name, args)
+		}
+		return []byte(`[{"id":"com.pokachy.poke","enabled":true}]`), nil
+	}
+	env.createTemp = func(_ string, pattern string) (*os.File, error) { return os.CreateTemp(tmp, pattern) }
+	env.download = func(_ context.Context, source, destination string) error {
+		downloaded = append(downloaded, source)
+		contents := installerContents
+		if source == bootstrapChecksumsURL {
+			digest := sha256.Sum256(installerContents)
+			contents = []byte(hex.EncodeToString(digest[:]) + "  install.sh\n")
+		}
+		return os.WriteFile(destination, contents, 0600)
+	}
+	if err := updateWithEnvironment(context.Background(), true, env); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if got, want := strings.Join(downloaded, "\n"), bootstrapInstallerURL+"\n"+bootstrapChecksumsURL; got != want {
+		t.Fatalf("downloaded %q, want %q", got, want)
+	}
+	want := [][]string{
+		{"bash"},
+		{"systemctl", "--user", "daemon-reload"},
+		{"systemctl", "--user", "restart", "pokachy.service"},
+		{"omarchy", "plugin", "update", omarchyPluginID, "--yes"},
+	}
+	if len(commands) != len(want) {
+		t.Fatalf("commands = %#v, want %#v", commands, want)
+	}
+	for i, command := range commands {
+		if command[0] != want[i][0] || (i > 0 && strings.Join(command[1:], "\x00") != strings.Join(want[i][1:], "\x00")) {
+			t.Errorf("command %d = %#v, want %#v", i, command, want[i])
+		}
+	}
+	if !strings.Contains(output.String(), "preserving your local session") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestUpdateRefusesInstallerWithWrongReleaseChecksum(t *testing.T) {
+	tmp := t.TempDir()
+	var output strings.Builder
+	env := testMaintenanceEnvironment(&output)
+	env.createTemp = func(_ string, pattern string) (*os.File, error) { return os.CreateTemp(tmp, pattern) }
+	env.download = func(_ context.Context, source, destination string) error {
+		contents := []byte("#!/bin/sh\necho unsafe\n")
+		if source == bootstrapChecksumsURL {
+			contents = []byte(strings.Repeat("0", 64) + "  install.sh\n")
+		}
+		return os.WriteFile(destination, contents, 0600)
+	}
+	if err := updateWithEnvironment(context.Background(), true, env); err == nil || !strings.Contains(err.Error(), "checksum verification failed") {
+		t.Fatalf("update error = %v, want checksum rejection", err)
+	}
+}
+
+func TestUninstallRemovesOnlyKnownLocalFilesAndKeepsAccount(t *testing.T) {
+	tmp := t.TempDir()
+	var output strings.Builder
+	var commands [][]string
+	var removed []string
+	env := testMaintenanceEnvironment(&output)
+	env.lookPath = func(name string) (string, error) {
+		if name == "systemctl" || name == "omarchy" {
+			return "/mock/" + name, nil
+		}
+		return "", errors.New("not installed")
+	}
+	env.run = func(_ context.Context, name string, args ...string) error {
+		commands = append(commands, append([]string{name}, args...))
+		return nil
+	}
+	env.runOutput = func(_ context.Context, name string, args ...string) ([]byte, error) {
+		return []byte(`[{"id":"com.pokachy.poke","enabled":true}]`), nil
+	}
+	env.remove = func(path string) error {
+		removed = append(removed, path)
+		return nil
+	}
+	env.configDir = func() string { return filepath.Join(tmp, "pokachy") }
+	env.userConfigDir = func() string { return filepath.Join(tmp, "config") }
+	env.installPrefix = func() string { return filepath.Join(tmp, "custom-prefix") }
+	if err := uninstallWithEnvironment(context.Background(), true, env); err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	wantCommands := [][]string{
+		{"omarchy", "plugin", "remove", omarchyPluginID, "--yes"},
+		{"systemctl", "--user", "disable", "--now", "pokachy.service"},
+		{"systemctl", "--user", "daemon-reload"},
+	}
+	if len(commands) != len(wantCommands) {
+		t.Fatalf("commands = %#v, want %#v", commands, wantCommands)
+	}
+	for i := range wantCommands {
+		if strings.Join(commands[i], "\x00") != strings.Join(wantCommands[i], "\x00") {
+			t.Errorf("command %d = %#v, want %#v", i, commands[i], wantCommands[i])
+		}
+	}
+	if got, want := strings.Join(removed, "\n"), strings.Join(knownPokachyPaths(env), "\n"); got != want {
+		t.Errorf("removed paths = %q, want only %q", got, want)
+	}
+	if !strings.Contains(output.String(), "does not delete your account") || !strings.Contains(output.String(), "account still exists") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestUninstallNeverTreatsSharedConfigDirectoryAsPokachyData(t *testing.T) {
+	tmp := t.TempDir()
+	var output strings.Builder
+	env := testMaintenanceEnvironment(&output)
+	env.configDir = func() string { return tmp }
+	env.userConfigDir = func() string { return filepath.Join(tmp, "config") }
+	env.installPrefix = func() string { return filepath.Join(tmp, "prefix") }
+	for _, path := range knownPokachyPaths(env) {
+		if path == tmp || strings.HasPrefix(path, tmp+string(filepath.Separator)+"credentials.json") {
+			t.Fatalf("unsafe config cleanup target: %s", path)
 		}
 	}
 }

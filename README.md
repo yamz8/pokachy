@@ -11,48 +11,30 @@
 
 <p align="center">
   <strong><a href="https://pokachy.com">pokachy.com</a></strong> ·
-  <strong><a href="https://github.com/yamz8/pokachy/releases/latest">Download</a></strong> ·
+  <strong><a href="https://pokachy.com/install">Install</a></strong> ·
   <strong><a href="docs/omarchy.md">Omarchy panel</a></strong>
 </p>
 
-## Install
+## Get started
 
-Download the Linux release archive for your architecture: `amd64` for most PCs, `arm64` for ARM machines, plus its `SHA256SUMS` file from the same [GitHub release](https://github.com/yamz8/pokachy/releases/latest). Verify the downloaded archive before extracting it:
-
-```sh
-sha256sum -c SHA256SUMS --ignore-missing
-```
-
-From the extracted directory:
+Pokachy supports Linux on amd64 and arm64. Install and connect this computer:
 
 ```sh
-bash scripts/install.sh
+curl -fsSL https://pokachy.com/install.sh | sh
 pokachy init
-systemctl --user daemon-reload
-systemctl --user enable --now pokachy.service
 ```
 
-The installer copies the CLI into `~/.local/bin` and installs a user service. Ensure that directory is on PATH. Notifications require `notify-send` (libnotify) and a compatible desktop notification service. systemd runs the background companion; the CLI also works independently on other Linux systems.
+Follow the browser prompt to sign in and approve the device code. Pokachy will connect your account, set up notifications where supported, and offer to add itself to your Omarchy bar.
 
-Sign in with email or GitHub, choose a handle, compare the browser device code with your terminal, and approve it. Omarchy/Git setup values can prefill editable suggestions with your confirmation. Email verification is still required.
-
-To upgrade, download and verify the newer release, extract it, run its `bash scripts/install.sh`, then reload and restart the user service:
+Prefer to inspect first? Download the script before running it:
 
 ```sh
-systemctl --user daemon-reload
-systemctl --user restart pokachy.service
-pokachy version
+curl -fsSLO https://pokachy.com/install.sh
+less install.sh
+bash install.sh
 ```
 
-The installer replaces the local binary and service unit but preserves your local session. To uninstall, sign out and stop the service, then remove the installed files. Logout clears this computer's credentials and offline cached state; removing `~/.config/pokachy` removes any remaining local client files. Use account settings to revoke other devices.
-
-```sh
-pokachy logout
-systemctl --user disable --now pokachy.service
-rm -f ~/.local/bin/pokachy ~/.config/systemd/user/pokachy.service ~/.local/share/icons/hicolor/scalable/apps/pokachy.svg
-rm -rf ~/.config/pokachy
-systemctl --user daemon-reload
-```
+For manual downloads, checksum verification, PATH and systemd help, upgrades, removal, and troubleshooting, read the [installation guide](docs/install.md).
 
 ## Say hey
 
@@ -76,13 +58,13 @@ Only mutual friends can poke. There is one outstanding poke per direction and a 
 
 ## Omarchy
 
-After installing and connecting the CLI:
+Pokachy uses Omarchy's native plugin manager:
 
 ```sh
-omarchy plugin add https://github.com/yamz8/pokachy.git --enable
+omarchy plugin add https://github.com/yamz8/pokachy-omarchy.git --enable
 ```
 
-Add Pokachy through Omarchy's bar widget settings. See [the panel guide](docs/omarchy.md). The CLI, server, and plugin are maintained in this one repository.
+Omarchy will show its own plugin confirmation and placement prompt. See [the panel guide](docs/omarchy.md).
 
 ## Develop
 
@@ -98,7 +80,7 @@ Open `http://127.0.0.1:8787`. Local mode offers **Fill the development code** an
 
 ```sh
 npm run build:cli
-POKACHY_CONFIG_DIR=/tmp/pokachy-dev cli/bin/pokachy init --server http://127.0.0.1:8787
+POKACHY_CONFIG_DIR=/tmp/pokachy-dev cli/bin/pokachy init --server http://127.0.0.1:8787 --no-desktop
 POKACHY_CONFIG_DIR=/tmp/pokachy-dev cli/bin/pokachy daemon
 ```
 

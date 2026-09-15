@@ -13,6 +13,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      # Resolve the companion repository before doing release work so a
+      # missing repository or token cannot leave only half the bundle updated.
+      - uses: actions/checkout@v4
+        with:
+          repository: yamz8/pokachy-omarchy
+          token: ${{ secrets.OMARCHY_PLUGIN_TOKEN }}
+          path: omarchy-plugin-repository
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -27,6 +34,24 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: scripts/package-release.sh "${GITHUB_REF_NAME}"
-      - env:
+      - name: Create private draft release
+        env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/*.tar.gz dist/SHA256SUMS --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" dist/*.tar.gz dist/install.sh dist/SHA256SUMS --generate-notes --draft
+      - name: Publish matching Omarchy plugin
+        working-directory: omarchy-plugin-repository
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          git rm -r --ignore-unmatch .
+          cp -R ../dist/pokachy-omarchy/. .
+          git add --all
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m "Release $RELEASE_TAG"
+          git tag "$RELEASE_TAG"
+          git push origin HEAD:main "$RELEASE_TAG"
+      - name: Publish release after companion plugin succeeds
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${GITHUB_REF_NAME}" --draft=false

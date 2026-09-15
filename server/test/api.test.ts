@@ -23,6 +23,12 @@ async function user(handle: string) {
 }
 beforeAll(async()=>{ await env.DB.exec(migration); });
 
+test("friendly install route serves the getting-started page",async()=>{
+  const response=await request("/install");
+  expect(response.status).toBe(200);
+  expect(await response.text()).toContain("Install Pokachy");
+});
+
 test("email onboarding, consent, idempotency, concurrency, reply, block and isolation",async()=>{
   const a=await user("alice"), b=await user("bobby"), x=await user("outsider");
   const poke=(token:string,handle:string,key=crypto.randomUUID())=>request(`/api/pokes/${handle}`,token,"POST",{}, {"Idempotency-Key":key});
