@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.pokachy.poke",
   "name": "Pokachy",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "author": "Pokachy",
   "description": "A tiny way to say hey to your Linux friends. Requires the pokachy CLI.",
   "kinds": ["bar-widget"],

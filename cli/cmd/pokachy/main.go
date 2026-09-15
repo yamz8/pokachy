@@ -30,7 +30,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.1.7"
+const version = "0.1.8"
 
 const omarchyPluginURL = "https://github.com/yamz8/pokachy-omarchy.git"
 const bootstrapInstallerURL = "https://github.com/yamz8/pokachy/releases/latest/download/install.sh"
@@ -364,6 +364,7 @@ func help() {
   pokachy status [--json]         Read the local companion status
   pokachy watch --json            Stream local status changes
   pokachy daemon                 Receive desktop notifications
+  pokachy omarchy install        Install or repair the Omarchy bar panel
   pokachy doctor                 Check local companion health
   pokachy update [--yes]         Update this computer from the public installer
   pokachy uninstall [--yes]      Remove this computer (does not delete your account)
@@ -396,6 +397,9 @@ func run(args []string) error {
 	}
 	if args[0] == "init" {
 		return onboarding(args[1:])
+	}
+	if args[0] == "omarchy" {
+		return omarchy(args[1:])
 	}
 	if args[0] == "doctor" {
 		return doctor()
@@ -627,6 +631,48 @@ func runInteractiveCommand(ctx context.Context, name string, args ...string) err
 	return cmd.Run()
 }
 
+func installOmarchyPlugin(ctx context.Context, env onboardingEnvironment) error {
+	if _, err := env.lookPath("omarchy"); err != nil {
+		return errors.New("Omarchy is not installed or is not available on PATH")
+	}
+	if env.runOutput != nil {
+		if data, err := env.runOutput(ctx, "omarchy", "plugin", "list", "--json"); err == nil {
+			var plugins []omarchyPlugin
+			if json.Unmarshal(data, &plugins) == nil {
+				for _, plugin := range plugins {
+					if plugin.ID != omarchyPluginID {
+						continue
+					}
+					if plugin.Enabled {
+						fmt.Fprintln(env.output, "Pokachy is already in your Omarchy bar.")
+						return nil
+					}
+					if err := env.run(ctx, "omarchy", "plugin", "enable", omarchyPluginID); err != nil {
+						return fmt.Errorf("could not enable Pokachy's Omarchy panel; try `omarchy plugin enable %s`: %w", omarchyPluginID, err)
+					}
+					fmt.Fprintln(env.output, "Pokachy is in your Omarchy bar.")
+					return nil
+				}
+			}
+		}
+	}
+	fmt.Fprintln(env.output, "Omarchy detected. Its plugin installer will ask whether to add Pokachy to your bar.")
+	if err := env.run(ctx, "omarchy", "plugin", "add", omarchyPluginURL, "--enable"); err != nil {
+		return fmt.Errorf("Pokachy's Omarchy panel was not added; try `omarchy plugin add %s --enable`: %w", omarchyPluginURL, err)
+	}
+	fmt.Fprintln(env.output, "Pokachy is in your Omarchy bar.")
+	return nil
+}
+
+func omarchy(args []string) error {
+	if len(args) != 1 || args[0] != "install" {
+		return errors.New("use 'pokachy omarchy install'")
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return installOmarchyPlugin(ctx, defaultOnboardingEnvironment)
+}
+
 var defaultOnboardingEnvironment = onboardingEnvironment{
 	lookPath:  exec.LookPath,
 	run:       runInteractiveCommand,
@@ -651,37 +697,11 @@ func configureDesktop(ctx context.Context, env onboardingEnvironment) {
 		fmt.Fprintln(env.output, "Desktop notifications need `notify-send` (libnotify) and a compatible notification service.")
 	}
 
-	if _, err := env.lookPath("omarchy"); err != nil {
-		return
-	}
-	if env.runOutput != nil {
-		if data, err := env.runOutput(ctx, "omarchy", "plugin", "list", "--json"); err == nil {
-			var plugins []omarchyPlugin
-			if json.Unmarshal(data, &plugins) == nil {
-				for _, plugin := range plugins {
-					if plugin.ID != omarchyPluginID {
-						continue
-					}
-					if plugin.Enabled {
-						fmt.Fprintln(env.output, "Pokachy is already in your Omarchy bar.")
-						return
-					}
-					if err := env.run(ctx, "omarchy", "plugin", "enable", omarchyPluginID); err != nil {
-						fmt.Fprintln(env.output, "Pokachy's Omarchy panel is installed but could not be enabled. Try: omarchy plugin enable "+omarchyPluginID)
-					} else {
-						fmt.Fprintln(env.output, "Pokachy is in your Omarchy bar.")
-					}
-					return
-				}
-			}
+	if _, err := env.lookPath("omarchy"); err == nil {
+		if err := installOmarchyPlugin(ctx, env); err != nil {
+			fmt.Fprintln(env.output, safe(err.Error()))
 		}
 	}
-	fmt.Fprintln(env.output, "Omarchy detected. Its plugin installer will ask whether to add Pokachy to your bar.")
-	if err := env.run(ctx, "omarchy", "plugin", "add", omarchyPluginURL, "--enable"); err != nil {
-		fmt.Fprintln(env.output, "Pokachy's Omarchy panel was not added. You can try later with: omarchy plugin add "+omarchyPluginURL+" --enable")
-		return
-	}
-	fmt.Fprintln(env.output, "Pokachy is in your Omarchy bar.")
 }
 
 func completeOnboarding(ctx context.Context, handle string, resumed bool) {
@@ -1056,7 +1076,7 @@ func doctorWithEnvironment(ctx context.Context, env maintenanceEnvironment) erro
 		case !known:
 			fmt.Fprintln(env.output, "Omarchy plugin: state unavailable — start Omarchy shell, then run `omarchy plugin list --json`")
 		case !installed:
-			fmt.Fprintln(env.output, "Omarchy plugin: not installed — run `omarchy plugin add "+omarchyPluginURL+" --enable`")
+			fmt.Fprintln(env.output, "Omarchy plugin: not installed — run `pokachy omarchy install`")
 		case !enabled:
 			issues = true
 			fmt.Fprintln(env.output, "Omarchy plugin: installed but disabled — run `omarchy plugin enable "+omarchyPluginID+"`")
