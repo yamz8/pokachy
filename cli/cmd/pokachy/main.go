@@ -28,7 +28,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.1.5"
+const version = "0.1.6"
 
 type Config struct {
 	Server string `json:"server"`
