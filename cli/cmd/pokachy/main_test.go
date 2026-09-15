@@ -342,6 +342,95 @@ func TestConfigureDesktopKeepsInstalledOmarchyPlugin(t *testing.T) {
 	}
 }
 
+func TestOmarchyInstallCommand(t *testing.T) {
+	original := defaultOnboardingEnvironment
+	t.Cleanup(func() { defaultOnboardingEnvironment = original })
+
+	t.Run("installs missing plugin with native consent", func(t *testing.T) {
+		var output strings.Builder
+		var commands [][]string
+		defaultOnboardingEnvironment = onboardingEnvironment{
+			lookPath: func(name string) (string, error) { return "/mock/" + name, nil },
+			runOutput: func(context.Context, string, ...string) ([]byte, error) {
+				return []byte(`[]`), nil
+			},
+			run: func(_ context.Context, name string, args ...string) error {
+				commands = append(commands, append([]string{name}, args...))
+				return nil
+			},
+			output: &output,
+		}
+
+		if err := omarchy([]string{"install"}); err != nil {
+			t.Fatalf("install: %v", err)
+		}
+		if len(commands) != 1 || strings.Join(commands[0], " ") != "omarchy plugin add "+omarchyPluginURL+" --enable" {
+			t.Fatalf("commands = %#v", commands)
+		}
+		if got := output.String(); !strings.Contains(got, "plugin installer will ask") || !strings.Contains(got, "Pokachy is in your Omarchy bar") {
+			t.Fatalf("unexpected output: %q", got)
+		}
+	})
+
+	t.Run("enables installed plugin", func(t *testing.T) {
+		var commands [][]string
+		defaultOnboardingEnvironment = onboardingEnvironment{
+			lookPath: func(name string) (string, error) { return "/mock/" + name, nil },
+			runOutput: func(context.Context, string, ...string) ([]byte, error) {
+				return []byte(`[{"id":"com.pokachy.poke","enabled":false}]`), nil
+			},
+			run: func(_ context.Context, name string, args ...string) error {
+				commands = append(commands, append([]string{name}, args...))
+				return nil
+			},
+			output: io.Discard,
+		}
+
+		if err := omarchy([]string{"install"}); err != nil {
+			t.Fatalf("enable: %v", err)
+		}
+		if len(commands) != 1 || strings.Join(commands[0], " ") != "omarchy plugin enable "+omarchyPluginID {
+			t.Fatalf("commands = %#v", commands)
+		}
+	})
+
+	t.Run("keeps enabled plugin", func(t *testing.T) {
+		var output strings.Builder
+		defaultOnboardingEnvironment = onboardingEnvironment{
+			lookPath: func(name string) (string, error) { return "/mock/" + name, nil },
+			runOutput: func(context.Context, string, ...string) ([]byte, error) {
+				return []byte(`[{"id":"com.pokachy.poke","enabled":true}]`), nil
+			},
+			run: func(context.Context, string, ...string) error {
+				t.Fatal("already enabled plugin should not run a command")
+				return nil
+			},
+			output: &output,
+		}
+
+		if err := omarchy([]string{"install"}); err != nil {
+			t.Fatalf("already enabled: %v", err)
+		}
+		if !strings.Contains(output.String(), "already in your Omarchy bar") {
+			t.Fatalf("unexpected output: %q", output.String())
+		}
+	})
+
+	t.Run("requires Omarchy", func(t *testing.T) {
+		defaultOnboardingEnvironment = onboardingEnvironment{
+			lookPath: func(string) (string, error) { return "", errors.New("not installed") },
+			output:   io.Discard,
+		}
+		if err := omarchy([]string{"install"}); err == nil || !strings.Contains(err.Error(), "Omarchy is not installed") {
+			t.Fatalf("error = %v", err)
+		}
+	})
+
+	if err := omarchy(nil); err == nil || !strings.Contains(err.Error(), "pokachy omarchy install") {
+		t.Fatalf("invalid command error = %v", err)
+	}
+}
+
 func testMaintenanceEnvironment(output io.Writer) maintenanceEnvironment {
 	return maintenanceEnvironment{
 		lookPath:      func(string) (string, error) { return "", errors.New("not installed") },

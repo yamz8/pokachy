@@ -61,10 +61,10 @@ Only mutual friends can poke. There is one outstanding poke per direction and a 
 Pokachy uses Omarchy's native plugin manager:
 
 ```sh
-omarchy plugin add https://github.com/yamz8/pokachy-omarchy.git --enable
+pokachy omarchy install
 ```
 
-Omarchy will show its own plugin confirmation and placement prompt. See [the panel guide](docs/omarchy.md).
+The command installs the panel, enables an existing disabled installation, or reports that it is already active. Omarchy will show its own plugin confirmation and placement prompt for a new installation. See [the panel guide](docs/omarchy.md).
 
 ## Develop
 

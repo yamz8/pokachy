@@ -11,13 +11,13 @@ pokachy init
 
 The installer downloads the current release for your architecture, verifies its SHA-256 checksum, and installs the command locally. `pokachy init` opens a browser to sign in, asks you to compare a device code, and completes this computer's connection.
 
-If you use Omarchy, setup can offer its native plugin installer. You can add the bar plugin later with:
+If you use Omarchy, `pokachy init` offers its native plugin installer. You can add the bar plugin later with:
 
 ```sh
-omarchy plugin add https://github.com/yamz8/pokachy-omarchy.git --enable
+pokachy omarchy install
 ```
 
-Omarchy shows its own plugin confirmation before enabling the panel. See the [Omarchy panel guide](omarchy.md) for how the widget works.
+The command also repairs an installed but disabled panel. Omarchy shows its own plugin confirmation before a new installation is enabled. See the [Omarchy panel guide](omarchy.md) for how the widget works.
 
 ## Review the installer first
 
@@ -124,6 +124,6 @@ Local uninstall does not delete your Pokachy account or affect other devices. Ma
 | Browser does not open during `init` | Copy the URL printed by the command into a browser on the same computer, then compare the device code before approving. |
 | No notifications arrive | Run `pokachy doctor`, ensure `notify-send` is installed, and make sure your desktop notification service is running. |
 | No systemd user manager | Run `pokachy daemon` from a terminal or use a local supervisor. |
-| Omarchy panel is missing | Run `omarchy plugin add https://github.com/yamz8/pokachy-omarchy.git --enable` and choose its bar placement when Omarchy asks. |
+| Omarchy panel is missing | Run `pokachy omarchy install` and choose its bar placement when Omarchy asks. |
 
 For help, open a [GitHub issue](https://github.com/yamz8/pokachy/issues) without private data, or contact [Pokachy support](https://pokachy.com/support.html).
