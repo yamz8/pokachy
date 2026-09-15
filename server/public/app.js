@@ -71,7 +71,7 @@ async function refresh() {
   $("loading").hidden=true;
   $("auth").hidden=!!session;$("signout").hidden=!session;
   for(const id of ["profile-form","approve","connected"]) $(id).hidden=true;
-  if(!session){$("card-title").textContent="Come say hey.";$("card-description").textContent="Sign in or create an account. No password required.";return;}
+  if(!session){$("card-title").textContent="Sign in";$("card-description").textContent="Use email or GitHub. No password needed.";return;}
   state=await api("/api/state");
   if(!state.me.handle){showProfile();return;}
   if(userCode){
@@ -91,7 +91,7 @@ busy($("email-form"),async()=>{
 });
 busy($("code-form"),async()=>{await api("/api/auth/sign-in/email-otp",{email:$("email").value,otp:$("code").value,name:hints.name||$("email").value.split("@")[0]});$("local-code").hidden=true;message("");await refresh();});
 busy($("profile-form"),async()=>{await api("/api/profile",{handle:$("handle").value},"PUT");await refresh();});
-$("change-email").onclick=()=>{$("email-form").hidden=false;$("code-form").hidden=true;$("local-code").hidden=true;$("code").value="";$("card-title").textContent="Come say hey.";$("card-description").textContent="Sign in or create an account. No password required.";$("auth-help-text").textContent="New here? Signing in creates your account automatically.";message("");$("email").focus();};
+$("change-email").onclick=()=>{$("email-form").hidden=false;$("code-form").hidden=true;$("local-code").hidden=true;$("code").value="";$("card-title").textContent="Sign in";$("card-description").textContent="Use email or GitHub. No password needed.";$("auth-help-text").textContent="New account? We’ll create it when you sign in.";message("");$("email").focus();};
 $("local-code").onclick=async()=>{try{const d=await api(`/api/dev/mail?email=${encodeURIComponent($("email").value)}`);$("code").value=d.otp||"";}catch(e){message(e.message,true);}};
 async function github(link=false){try{const result=await api(link?"/api/auth/link-social":"/api/auth/sign-in/social",{provider:"github",callbackURL:location.origin+location.pathname+location.search});if(result.url) location.assign(result.url);}catch(e){message(e.message,true);}}
 $("github").onclick=()=>github();$("link-github").onclick=()=>github(true);
