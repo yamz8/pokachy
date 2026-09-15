@@ -220,7 +220,7 @@ test("health reports deployment identity and fails closed on database outage", a
   const response = await worker.fetch(new Request(origin + "/health"), { ...env, DEPLOY_REVISION: "test-revision" }, ctx);
   expect(response.status).toBe(200);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
-  expect(await response.json()).toEqual({ status: "ok", version: "0.1.6", revision: "test-revision" });
+  expect(await response.json()).toEqual({ status: "ok", version: "0.1.7", revision: "test-revision" });
   const prepare = vi.spyOn(env.DB, "prepare").mockImplementation(() => { throw new Error("private database detail"); });
   try {
     const failed = await request("/health");
