@@ -4,9 +4,9 @@ The supplied green-and-paper parrot reference is expressed on a uniform pixel gr
 
 - `pokachy-parrot.svg`: transparent full-color master and desktop notification icon.
 - `pokachy-symbol.svg`: monochrome symbol; `currentColor` follows its surrounding surface. A cutout separates the face from the feathers so the bird remains recognizable in one color.
-- `plugins/omarchy/BrandIcon.qml`: native square-cell rendering of the same grid, used by the bar and poke actions. No raster image scaling or recoloring effect is required.
+- `plugins/omarchy/BrandIcon.qml`: native square-cell rendering used by the bar and poke actions. Its compact mode reproduces the approved 14 × 14 Omarchy parrot mask exactly and recolors its occupied cells through the shell's foreground or urgent role. No raster image scaling or recoloring effect is required.
 
-Prefer integer cell sizes: 16, 32, 48, or 64 pixels. The bar centers a 16-pixel mark in the shell's theme-scaled icon slot; actions use a 32-pixel canvas. Actual cell sizes are rounded down to whole pixels. Do not add glow, circles, decorative particles, or a background tile.
+Prefer integer cell sizes: 16, 32, 48, or 64 pixels. The bar centers the monochrome system glyph in the shell's theme-scaled standard icon slot; actions use the full 12 × 16 mark on a 32-pixel canvas. Actual cell sizes are rounded down to whole pixels. Do not add glow, circles, decorative particles, or a background tile.
 
 Keep personal avatars distinct: user initials (and later profile photos) identify people; the parrot identifies Pokachy and the poke action. Icon-only actions must retain contextual tooltips and accessible names. Incoming replies use the shell's urgent color; waiting actions are dimmed and disabled.
 
