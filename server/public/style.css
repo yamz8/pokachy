@@ -96,6 +96,14 @@ input::placeholder { color: var(--faint); }
 .quick-start { margin-top: 18px; }
 .command { display: block; margin: 7px 0; padding: 11px; overflow-wrap: anywhere; border: 1px solid var(--line); background: #070a08; color: #d7ddd7; font: 11px/1.5 var(--mono); }
 .command span { color: var(--green); }
+.account-email-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.account-email-row > span { min-width: 0; display: grid; gap: 3px; }
+.account-email-row strong { color: #dce1dc; font-size: 12px; }
+.account-email-row small { overflow: hidden; color: var(--faint); font: 11px/1.3 var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.account-email-row button { flex: 0 0 auto; }
+.email-change-panel { padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+.email-change-panel .fine { margin-top: 13px; }
+.email-change-panel .text-button { display: block; margin: 7px auto 0; }
 .session-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding: 13px 0; border: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: transparent; color: var(--white); text-align: left; }
 .session-toggle:hover { color: var(--green); }
 .session-toggle span { display: grid; gap: 3px; }

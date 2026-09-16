@@ -2,6 +2,8 @@ import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, expect, test, vi } from "vitest";
 import worker from "../src/index";
 import migration from "../migrations/0001_initial.sql?raw";
+import profileSettingsMigration from "../migrations/0002_profile_settings.sql?raw";
+import accountHandoffsMigration from "../migrations/0003_account_handoffs.sql?raw";
 import { version } from "../package.json";
 
 const origin = "http://127.0.0.1:8787";
@@ -10,6 +12,13 @@ let testIP = 0;
 beforeEach(() => { testIP++; });
 async function request(path: string, token?: string, method="GET", body?: unknown, headers: Record<string,string>={}) {
   return worker.fetch(new Request(origin+path,{method,headers:{"Content-Type":"application/json","X-Pokachy-Client":"cli","CF-Connecting-IP":`192.0.2.${testIP}`,...(token?{Authorization:`Bearer ${token}`} : {}),...headers},body:body===undefined?undefined:JSON.stringify(body)}),env,ctx);
+}
+async function rawRequest(path: string, token: string, body: Uint8Array, contentType: string) {
+  return worker.fetch(new Request(origin + path, {
+    method: "PUT",
+    headers: { "Content-Type": contentType, "X-Pokachy-Client": "cli", "CF-Connecting-IP": `192.0.2.${testIP}`, Authorization: `Bearer ${token}` },
+    body,
+  }), env, ctx);
 }
 async function user(handle: string) {
   const email=`${handle}@example.test`;
@@ -22,12 +31,40 @@ async function user(handle: string) {
   expect((await request("/api/profile",data.token,"PUT",{handle})).status).toBe(200);
   return data;
 }
-beforeAll(async()=>{ await env.DB.exec(migration); });
+beforeAll(async()=>{ await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); });
 
 test("friendly install route serves the getting-started page",async()=>{
   const response=await request("/install");
   expect(response.status).toBe(200);
   expect(await response.text()).toContain("Install Pokachy");
+});
+
+test("account handoffs are same-account, short-lived, single-use capabilities",async()=>{
+  const owner=await user("handoffowner"), other=await user("handoffother");
+  expect((await request("/api/account/handoff",owner.token,"POST",{action:"unsupported"})).status).toBe(400);
+  const created=await request("/api/account/handoff",owner.token,"POST",{action:"email"});
+  expect(created.status,await created.clone().text()).toBe(200);
+  const data=await created.json() as {url:string;expiresIn:number};
+  const target=new URL(data.url);
+  const token=new URLSearchParams(target.hash.slice(1)).get("handoff")!;
+  expect({origin:target.origin,path:target.pathname,query:target.search,action:new URLSearchParams(target.hash.slice(1)).get("action"),expiresIn:data.expiresIn})
+    .toEqual({origin,path:"/account",query:"",action:"email",expiresIn:300});
+  expect(token).toMatch(/^[0-9a-f]{64}$/);
+  expect(await env.DB.prepare("SELECT 1 FROM account_handoffs WHERE token_hash=?").bind(token).first()).toBeNull();
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token))),byte=>byte.toString(16).padStart(2,"0")).join("");
+  expect(await env.DB.prepare("SELECT token_hash FROM account_handoffs").first()).toEqual({token_hash:digest});
+  expect((await request("/api/account/handoff/claim",undefined,"POST",{token,action:"email"})).status).toBe(401);
+  expect((await request("/api/account/handoff/claim",other.token,"POST",{token,action:"email"})).status).toBe(409);
+  expect(await env.DB.prepare("SELECT 1 FROM account_handoffs").first()).not.toBeNull();
+  expect((await request("/api/account/handoff/claim",owner.token,"POST",{token,action:"email"})).status).toBe(200);
+  expect(await env.DB.prepare("SELECT 1 FROM account_handoffs").first()).toBeNull();
+  expect((await request("/api/account/handoff/claim",owner.token,"POST",{token,action:"email"})).status).toBe(400);
+
+  const expiring=await (await request("/api/account/handoff",owner.token,"POST",{action:"account"})).json() as {url:string};
+  const expiredToken=new URLSearchParams(new URL(expiring.url).hash.slice(1)).get("handoff")!;
+  await env.DB.prepare("UPDATE account_handoffs SET expires_at=?").bind(Date.now()-1).run();
+  expect((await request("/api/account/handoff/claim",owner.token,"POST",{token:expiredToken,action:"account"})).status).toBe(400);
+  expect(await env.DB.prepare("SELECT 1 FROM account_handoffs").first()).toBeNull();
 });
 
 test("email onboarding, consent, idempotency, concurrency, reply, block and isolation",async()=>{
@@ -139,7 +176,7 @@ test("bad and replayed email codes fail; handles are unique",async()=>{
   expect((await request("/api/profile",u.token,"PUT",null)).status).toBe(400);
 });
 
-test("state exposes only GitHub profile pictures",async()=>{
+test("state exposes GitHub pictures but rejects untrusted external images",async()=>{
   const a=await user("avataralice"),b=await user("avatarbobby");
   const githubImage="https://avatars.githubusercontent.com/u/123456?v=4";
   await env.DB.batch([
@@ -164,6 +201,83 @@ test("state exposes only GitHub profile pictures",async()=>{
     await env.DB.prepare("UPDATE user SET image=? WHERE id=?").bind(rejected,a.user.id).run();
     expect((await (await request("/api/state",b.token)).json()).friends[0].image).toBeNull();
   }
+});
+
+test("state reports only the authenticated user's GitHub connection",async()=>{
+  const owner=await user("githubowner"), other=await user("githubother");
+  let state=await (await request("/api/state",owner.token)).json() as {me:{githubAvailable:boolean;githubLinked:boolean}};
+  expect(state.me).toEqual(expect.objectContaining({githubAvailable:false,githubLinked:false}));
+  const now=Date.now();
+  await env.DB.prepare("INSERT INTO account(id,accountId,providerId,userId,createdAt,updatedAt) VALUES (?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),"other-github","github",other.user.id,now,now).run();
+  state=await (await request("/api/state",owner.token)).json() as typeof state;
+  expect(state.me.githubLinked).toBe(false);
+  await env.DB.prepare("INSERT INTO account(id,accountId,providerId,userId,createdAt,updatedAt) VALUES (?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),"owner-github","github",owner.user.id,now,now).run();
+  state=await (await request("/api/state",owner.token)).json() as typeof state;
+  expect(state.me.githubLinked).toBe(true);
+});
+
+test("email changes require codes from both the current and new inboxes",async()=>{
+  const owner=await user("emailchangeowner");
+  const currentEmail="emailchangeowner@example.test", newEmail="emailchangeowner-new@example.test";
+  const started=await request("/api/account/email-change/current-code",owner.token,"POST",{});
+  expect(started.status,await started.clone().text()).toBe(200);
+  const currentCode=(await (await request(`/api/dev/mail?email=${currentEmail}`)).json() as {otp:string}).otp;
+
+  expect((await request("/api/auth/email-otp/request-email-change",owner.token,"POST",{newEmail,otp:"000000"})).status).toBe(400);
+  const requested=await request("/api/auth/email-otp/request-email-change",owner.token,"POST",{newEmail,otp:currentCode});
+  expect(requested.status,await requested.clone().text()).toBe(200);
+  expect((await (await request("/api/state",owner.token)).json()).me.email).toBe(currentEmail);
+  const newCode=(await (await request(`/api/dev/mail?email=${newEmail}`)).json() as {otp:string}).otp;
+
+  expect((await request("/api/auth/email-otp/change-email",owner.token,"POST",{newEmail,otp:"000000"})).status).toBe(400);
+  const changed=await request("/api/auth/email-otp/change-email",owner.token,"POST",{newEmail,otp:newCode});
+  expect(changed.status,await changed.clone().text()).toBe(200);
+  expect((await (await request("/api/state",owner.token)).json()).me.email).toBe(newEmail);
+  expect(await env.DB.prepare("SELECT 1 FROM user WHERE id=? AND email=? AND emailVerified=1").bind(owner.user.id,newEmail).first()).not.toBeNull();
+});
+
+test("profile settings update display identity and safely replace uploaded avatars",async()=>{
+  const owner=await user("settingsowner"),friend=await user("settingsfriend");
+  const githubImage="https://avatars.githubusercontent.com/u/42?v=4";
+  await env.DB.prepare("UPDATE user SET image=? WHERE id=?").bind(githubImage,owner.user.id).run();
+  await request("/api/friends/settingsfriend",owner.token,"POST",{});
+  await request("/api/friends/settingsowner/accept",friend.token,"POST",{});
+
+  const updated=await request("/api/profile",owner.token,"PUT",{handle:"newhandle",name:"New Name",userId:friend.user.id});
+  expect(updated.status,await updated.clone().text()).toBe(200);
+  let friendState=await (await request("/api/state",friend.token)).json() as {me:{handle:string;name:string};friends:Array<{handle:string;name:string;image:string|null}>};
+  expect(friendState.me).toEqual(expect.objectContaining({handle:"settingsfriend",name:"settingsfriend"}));
+  expect(friendState.friends[0]).toEqual(expect.objectContaining({handle:"newhandle",name:"New Name",image:githubImage}));
+  expect((await request("/api/profile",owner.token,"PUT",{name:"\u202ehidden"})).status).toBe(400);
+
+  const png=new Uint8Array([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,1,2,3]);
+  const uploaded=await rawRequest("/api/profile/image",owner.token,png,"image/png");
+  expect(uploaded.status,await uploaded.clone().text()).toBe(200);
+  const firstKey=(await env.DB.prepare("SELECT avatar_key FROM profiles WHERE user_id=?").bind(owner.user.id).first<{avatar_key:string}>())!.avatar_key;
+  friendState=await (await request("/api/state",friend.token)).json() as typeof friendState;
+  const customURL=friendState.friends[0].image!;
+  expect(customURL).toBe(`${origin}/avatars/${owner.user.id}/${firstKey.split("/")[2]}`);
+  const image=await request(new URL(customURL).pathname);
+  expect(image.status).toBe(200);
+  expect(image.headers.get("Content-Type")).toBe("image/png");
+  expect(new Uint8Array(await image.arrayBuffer())).toEqual(png);
+
+  expect((await rawRequest("/api/profile/image",owner.token,new Uint8Array([1,2,3]),"image/png")).status).toBe(400);
+  expect((await rawRequest("/api/profile/image",owner.token,new Uint8Array(2*1024*1024+1),"image/png")).status).toBe(400);
+  expect(await env.AVATARS.get(firstKey)).not.toBeNull();
+  const jpeg=new Uint8Array([0xff,0xd8,0xff,0xd9]);
+  expect((await rawRequest("/api/profile/image",owner.token,jpeg,"image/jpeg")).status).toBe(200);
+  const secondKey=(await env.DB.prepare("SELECT avatar_key FROM profiles WHERE user_id=?").bind(owner.user.id).first<{avatar_key:string}>())!.avatar_key;
+  expect(secondKey).not.toBe(firstKey);
+  expect(await env.AVATARS.get(firstKey)).toBeNull();
+  expect(await env.AVATARS.get(secondKey)).not.toBeNull();
+  expect((await request("/api/profile/image",owner.token,"DELETE",{})).status).toBe(200);
+  expect(await env.AVATARS.get(secondKey)).toBeNull();
+  const fallback=await (await request("/api/state",friend.token)).json() as typeof friendState;
+  expect(fallback.friends[0].image).toBe(githubImage);
+  expect((await request(new URL(customURL).pathname)).status).toBe(404);
 });
 
 test("live updates stay private and a revoked session loses its connection",async()=>{

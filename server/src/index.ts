@@ -12,10 +12,15 @@ type App = { Bindings: AppEnv; Variables: { identity: Identity } };
 type Ctx = Context<App>;
 const app = new Hono<App>();
 const handlePattern = /^[a-z0-9][a-z0-9_]{2,23}$/;
+const avatarMaxBytes = 2 * 1024 * 1024;
 const error = (c: Ctx, message: string, status: 400 | 401 | 403 | 404 | 409 | 429 | 503 = 400) => c.json({ error: message }, status);
 const uid = (c: Ctx) => c.get("identity").user.id;
 const pair = (a: string, b: string) => [a, b].sort();
 const sql = (c: Ctx, query: string, ...args: unknown[]) => c.env.DB.prepare(query).bind(...args);
+const hex = (bytes: Uint8Array) => Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
+async function handoffHash(token: string) {
+  return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
+}
 function githubAvatar(value: unknown) {
   if (typeof value !== "string" || value.length > 2048) return null;
   try {
@@ -23,7 +28,24 @@ function githubAvatar(value: unknown) {
     return url.origin === "https://avatars.githubusercontent.com" && !url.username && !url.password ? url.href : null;
   } catch { return null; }
 }
-const withAvatar = <T extends Record<string, unknown>>(row: T): T & { image: string | null } => ({ ...row, image: githubAvatar(row.image) });
+function avatarURL(c: Ctx, avatarKey: unknown, fallback: unknown) {
+  if (typeof avatarKey === "string" && /^avatars\/[A-Za-z0-9-]+\/[0-9a-f-]{36}$/.test(avatarKey)) {
+    const parts = avatarKey.split("/");
+    return `${c.env.BASE_URL}/avatars/${encodeURIComponent(parts[1])}/${encodeURIComponent(parts[2])}`;
+  }
+  return githubAvatar(fallback);
+}
+const withAvatar = <T extends Record<string, unknown>>(c: Ctx, row: T): Omit<T, "avatar_key"> & { image: string | null } => {
+  const { avatar_key, ...visible } = row;
+  return { ...visible, image: avatarURL(c, avatar_key, row.image) };
+};
+function imageType(bytes: Uint8Array): "image/png" | "image/jpeg" | "image/webp" | "image/avif" | null {
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) return "image/png";
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length >= 12 && new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" && new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP") return "image/webp";
+  if (bytes.length >= 12 && new TextDecoder().decode(bytes.slice(4, 8)) === "ftyp" && ["avif", "avis"].includes(new TextDecoder().decode(bytes.slice(8, 12)))) return "image/avif";
+  return null;
+}
 const historyPageSize = 50;
 type HistoryCursor = { createdAt: number; id: string };
 function encodeHistoryCursor(cursor: HistoryCursor) {
@@ -48,6 +70,12 @@ async function notify(c: Ctx, ...ids: string[]) {
     console.warn(JSON.stringify({ event: "live_notification_failed" }));
   })));
 }
+async function notifyProfile(c: Ctx) {
+  const id = uid(c);
+  const contacts = await sql(c, "SELECT CASE WHEN a=? THEN b ELSE a END AS id FROM friendships WHERE a=? OR b=?", id, id, id).all<{ id: string }>();
+  const ids = [id, ...contacts.results.map(contact => contact.id)];
+  for (let start = 0; start < ids.length; start += 20) await notify(c, ...ids.slice(start, start + 20));
+}
 async function rate(c: Ctx, key: string, limit: number, windowMs = 60_000) {
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
   const id = Array.from(new Uint8Array(hash), n => n.toString(16).padStart(2, "0")).join("");
@@ -61,7 +89,12 @@ app.use("*", async (c, next) => {
   if (c.req.method !== "GET" && c.req.method !== "HEAD") {
     const origin = c.req.header("Origin");
     if (origin && origin !== c.env.BASE_URL) return error(c, "Invalid request origin", 403);
-    if (!c.req.header("Content-Type")?.startsWith("application/json")) return error(c, "JSON body required");
+    const avatarUpload = c.req.method === "PUT" && c.req.path === "/api/profile/image";
+    if (avatarUpload) {
+      const ip = c.req.header("CF-Connecting-IP") ?? "local";
+      if (!(await rate(c, `avatar-upload:${ip}`, 10, 300_000))) return error(c, "Too many image uploads. Try again later.", 429);
+      if (!c.req.header("Content-Type")?.toLowerCase().startsWith("image/")) return error(c, "Choose a PNG, JPEG, WebP, or AVIF image");
+    } else if (!c.req.header("Content-Type")?.startsWith("application/json")) return error(c, "JSON body required");
     if (!origin && c.req.header("X-Pokachy-Client") !== "cli") return error(c, "Client header required", 403);
     // Bound the cloned body before any authentication or JSON parsing.
     const reader = c.req.raw.clone().body?.getReader();
@@ -71,11 +104,13 @@ app.use("*", async (c, next) => {
         const chunk = await reader.read();
         if (chunk.done) break;
         size += chunk.value.byteLength;
-        if (size > 16_384) { void reader.cancel(); return error(c, "Request too large"); }
+        if (size > (avatarUpload ? avatarMaxBytes : 16_384)) { void reader.cancel(); return error(c, avatarUpload ? "Profile image must be 2 MB or smaller" : "Request too large"); }
       }
     }
-    const body = await c.req.raw.clone().json();
-    if (body === null || typeof body !== "object" || Array.isArray(body)) return error(c, "A JSON object is required");
+    if (!avatarUpload) {
+      const body = await c.req.raw.clone().json();
+      if (body === null || typeof body !== "object" || Array.isArray(body)) return error(c, "A JSON object is required");
+    }
   }
   await next();
   if (c.res.status === 101) return;
@@ -98,6 +133,21 @@ app.get("/health", async c => {
   }
 });
 
+app.get("/avatars/:userId/:version", async c => {
+  const key = `avatars/${c.req.param("userId")}/${c.req.param("version")}`;
+  if (!/^avatars\/[A-Za-z0-9-]+\/[0-9a-f-]{36}$/.test(key)) return c.body(null, 404);
+  const current = await sql(c, "SELECT avatar_key FROM profiles WHERE user_id=? AND avatar_key=? AND suspended=0", c.req.param("userId"), key).first<{ avatar_key: string }>();
+  if (!current) return c.body(null, 404);
+  const object = await c.env.AVATARS.get(key);
+  if (!object || !("body" in object)) return c.body(null, 404);
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("ETag", object.httpEtag);
+  headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  headers.set("X-Content-Type-Options", "nosniff");
+  return new Response(object.body, { headers });
+});
+
 app.on(["GET", "POST"], "/api/auth/*", async c => {
   const ip = c.req.header("CF-Connecting-IP") ?? "local";
   if (!(await rate(c, `auth:${ip}`, 120))) return error(c, "Too many requests. Try again shortly.", 429);
@@ -118,7 +168,16 @@ app.on(["GET", "POST"], "/api/auth/*", async c => {
       } catch { return error(c, "Verification unavailable. Please try again.", 503); }
     }
   }
-  return createAuth(c.env).handler(c.req.raw);
+  const auth = createAuth(c.env);
+  const emailChange = c.req.method === "POST" && c.req.path.endsWith("/email-otp/change-email");
+  const identity = emailChange ? await auth.api.getSession({ headers: c.req.raw.headers }) : null;
+  const response = await auth.handler(c.req.raw);
+  if (response.ok && identity) {
+    await c.env.HUBS.getByName(`user:${identity.user.id}`).publish().catch(() => {
+      console.warn(JSON.stringify({ event: "email_change_sync_failed" }));
+    });
+  }
+  return response;
 });
 
 // Local-only email simulator. No real mail is sent during development.
@@ -141,42 +200,120 @@ app.use("/api/*", async (c, next) => {
   await next();
 });
 
+app.post("/api/account/handoff", async c => {
+  const { action } = await c.req.json<{ action?: unknown }>();
+  if (action !== "account" && action !== "github" && action !== "email") return error(c, "Choose a supported account action");
+  if (!(await rate(c, `account-handoff:${uid(c)}`, 5, 300_000))) return error(c, "Please wait before opening account settings again", 429);
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const token = hex(bytes);
+  const tokenHash = await handoffHash(token);
+  const now = Date.now();
+  await c.env.DB.batch([
+    sql(c, "DELETE FROM account_handoffs WHERE user_id=?", uid(c)),
+    sql(c, "INSERT INTO account_handoffs(token_hash,user_id,action,expires_at,created_at) VALUES (?,?,?,?,?)", tokenHash, uid(c), action, now + 300_000, now),
+  ]);
+  const targetURL = new URL("/account", c.env.BASE_URL);
+  targetURL.hash = new URLSearchParams({ handoff: token, action }).toString();
+  return c.json({ url: targetURL.href, expiresIn: 300 });
+});
+
+app.post("/api/account/handoff/claim", async c => {
+  const { token, action } = await c.req.json<{ token?: unknown; action?: unknown }>();
+  if (typeof token !== "string" || !/^[0-9a-f]{64}$/.test(token) || (action !== "account" && action !== "github" && action !== "email")) {
+    return error(c, "This account link is invalid or expired");
+  }
+  const tokenHash = await handoffHash(token);
+  const handoff = await sql(c, "SELECT user_id,action,expires_at FROM account_handoffs WHERE token_hash=?", tokenHash)
+    .first<{ user_id: string; action: string; expires_at: number }>();
+  if (!handoff || handoff.expires_at <= Date.now() || handoff.action !== action) {
+    if (handoff) await sql(c, "DELETE FROM account_handoffs WHERE token_hash=?", tokenHash).run();
+    return error(c, "This account link is invalid or expired");
+  }
+  if (handoff.user_id !== uid(c)) return error(c, "This browser is signed in to a different Pokachy account. Sign out here, then sign in to the account shown in your panel.", 409);
+  const consumed = await sql(c, "DELETE FROM account_handoffs WHERE token_hash=? AND user_id=? AND action=? AND expires_at>?", tokenHash, uid(c), action, Date.now()).run();
+  if (consumed.meta.changes !== 1) return error(c, "This account link is invalid or expired");
+  return c.json({ ok: true, action });
+});
+
 app.put("/api/profile", async c => {
-  const body = await c.req.json<{ handle?: string; quiet?: boolean }>();
+  const body = await c.req.json<{ handle?: string; name?: string; quiet?: boolean }>();
   if (body.handle !== undefined && typeof body.handle !== "string") return error(c, "Handle must be text");
+  if (body.name !== undefined && typeof body.name !== "string") return error(c, "Display name must be text");
+  const name = body.name?.trim();
+  if (name !== undefined && (name.length < 1 || name.length > 80 || /[\p{Cc}\p{Cf}]/u.test(name))) return error(c, "Display name must be 1–80 visible characters");
   const existing = await sql(c, "SELECT handle FROM profiles WHERE user_id=?", uid(c)).first<{ handle: string }>();
   const handle = (body.handle ?? existing?.handle ?? "").replace(/^@/, "").toLowerCase();
   if (!handlePattern.test(handle)) return error(c, "Use 3–24 lowercase letters, numbers, or underscores");
   if (["admin", "support", "pokachy", "system"].includes(handle)) return error(c, "This handle is reserved");
   if (body.quiet !== undefined && typeof body.quiet !== "boolean") return error(c, "Quiet must be true or false");
+  const taken = await sql(c, "SELECT 1 FROM profiles WHERE handle=? AND user_id<>?", handle, uid(c)).first();
+  if (taken) return error(c, "That handle is taken", 409);
+  if (name !== undefined) await createAuth(c.env).api.updateUser({ body: { name }, headers: c.req.raw.headers });
   try {
     await sql(c, "INSERT INTO profiles(user_id,handle,quiet) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET handle=excluded.handle, quiet=COALESCE(?,quiet)", uid(c), handle, body.quiet ? 1 : 0, body.quiet === undefined ? null : Number(body.quiet)).run();
   } catch (e) {
+    if (name !== undefined) {
+      await createAuth(c.env).api.updateUser({ body: { name: c.get("identity").user.name }, headers: c.req.raw.headers }).catch(() => {
+        console.error(JSON.stringify({ event: "profile_name_rollback_failed" }));
+      });
+    }
     if (String(e).includes("UNIQUE")) return error(c, "That handle is taken", 409);
     throw e;
   }
-  await notify(c, uid(c));
-  return c.json({ ok: true, handle });
+  await notifyProfile(c);
+  return c.json({ ok: true, handle, name: name ?? c.get("identity").user.name });
+});
+
+app.put("/api/profile/image", async c => {
+  const profile = await sql(c, "SELECT avatar_key FROM profiles WHERE user_id=?", uid(c)).first<{ avatar_key: string | null }>();
+  if (!profile) return error(c, "Choose a handle first", 409);
+  const data = await c.req.arrayBuffer();
+  if (data.byteLength === 0 || data.byteLength > avatarMaxBytes) return error(c, "Profile image must be between 1 byte and 2 MB");
+  const contentType = imageType(new Uint8Array(data));
+  if (!contentType) return error(c, "Choose a valid PNG, JPEG, WebP, or AVIF image");
+  const key = `avatars/${uid(c)}/${crypto.randomUUID()}`;
+  await c.env.AVATARS.put(key, data, { httpMetadata: { contentType, cacheControl: "public, max-age=31536000, immutable" } });
+  try {
+    await sql(c, "UPDATE profiles SET avatar_key=? WHERE user_id=?", key, uid(c)).run();
+  } catch (cause) {
+    await c.env.AVATARS.delete(key);
+    throw cause;
+  }
+  if (profile.avatar_key) await c.env.AVATARS.delete(profile.avatar_key);
+  await notifyProfile(c);
+  return c.json({ ok: true, image: avatarURL(c, key, null) });
+});
+
+app.delete("/api/profile/image", async c => {
+  const profile = await sql(c, "SELECT avatar_key FROM profiles WHERE user_id=?", uid(c)).first<{ avatar_key: string | null }>();
+  if (!profile) return error(c, "Choose a handle first", 409);
+  await sql(c, "UPDATE profiles SET avatar_key=NULL WHERE user_id=?", uid(c)).run();
+  if (profile.avatar_key) await c.env.AVATARS.delete(profile.avatar_key);
+  await notifyProfile(c);
+  return c.json({ ok: true });
 });
 
 app.get("/api/state", async c => {
   const id = uid(c);
   const results = await c.env.DB.batch<Record<string, unknown>>([
-    sql(c, "SELECT handle,quiet FROM profiles WHERE user_id=?", id),
-    sql(c, `SELECT p.handle,u.name,u.image,f.accepted,f.requester=? AS outgoing,
+    sql(c, "SELECT handle,quiet,avatar_key FROM profiles WHERE user_id=?", id),
+    sql(c, `SELECT p.handle,p.avatar_key,u.name,u.image,f.accepted,f.requester=? AS outgoing,
       EXISTS(SELECT 1 FROM pokes WHERE sender=? AND recipient=p.user_id AND resolved_at IS NULL) AS waiting
       FROM friendships f JOIN profiles p ON p.user_id=CASE WHEN f.a=? THEN f.b ELSE f.a END JOIN user u ON u.id=p.user_id
       WHERE (f.a=? OR f.b=?) AND p.suspended=0 ORDER BY f.accepted DESC,p.handle`, id,id,id,id,id),
-    sql(c, "SELECT k.id,p.handle,u.name,u.image,k.created_at FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN user u ON u.id=k.sender WHERE k.recipient=? AND k.resolved_at IS NULL AND p.suspended=0 ORDER BY k.created_at DESC LIMIT 100", id),
-    sql(c, "SELECT k.id,p.handle,u.name,u.image,k.created_at,k.sender=? AS outgoing,k.resolved_at FROM pokes k JOIN profiles p ON p.user_id=CASE WHEN k.sender=? THEN k.recipient ELSE k.sender END JOIN user u ON u.id=p.user_id WHERE k.sender=? OR k.recipient=? ORDER BY k.created_at DESC LIMIT 50",id,id,id,id),
-    sql(c, "SELECT p.handle,u.name,u.image FROM blocks b JOIN profiles p ON p.user_id=b.blocked JOIN user u ON u.id=p.user_id WHERE b.blocker=?", id),
+    sql(c, "SELECT k.id,p.handle,p.avatar_key,u.name,u.image,k.created_at FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN user u ON u.id=k.sender WHERE k.recipient=? AND k.resolved_at IS NULL AND p.suspended=0 ORDER BY k.created_at DESC LIMIT 100", id),
+    sql(c, "SELECT k.id,p.handle,p.avatar_key,u.name,u.image,k.created_at,k.sender=? AS outgoing,k.resolved_at FROM pokes k JOIN profiles p ON p.user_id=CASE WHEN k.sender=? THEN k.recipient ELSE k.sender END JOIN user u ON u.id=p.user_id WHERE k.sender=? OR k.recipient=? ORDER BY k.created_at DESC LIMIT 50",id,id,id,id),
+    sql(c, "SELECT p.handle,p.avatar_key,u.name,u.image FROM blocks b JOIN profiles p ON p.user_id=b.blocked JOIN user u ON u.id=p.user_id WHERE b.blocker=?", id),
     sql(c, "SELECT COUNT(*) AS count FROM pokes WHERE recipient=?", id),
+    sql(c, "SELECT 1 AS linked FROM account WHERE userId=? AND providerId='github' LIMIT 1", id),
   ]);
   const profile = results[0].results[0];
-  const friends = results[1].results.map(withAvatar);
-  return c.json({ me: { id, name: c.get("identity").user.name, email: c.get("identity").user.email, image: githubAvatar(c.get("identity").user.image), handle: profile?.handle ?? null, quiet: !!profile?.quiet },
+  const friends = results[1].results.map(row => withAvatar(c, row));
+  return c.json({ me: { id, name: c.get("identity").user.name, email: c.get("identity").user.email, image: avatarURL(c, profile?.avatar_key, c.get("identity").user.image), customImage: !!profile?.avatar_key, handle: profile?.handle ?? null, quiet: !!profile?.quiet,
+      githubAvailable: !!(c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET), githubLinked: !!results[6].results[0] },
     friends: friends.filter(f => f.accepted), requests: friends.filter(f => !f.accepted),
-    inbox: results[2].results.map(withAvatar), history: results[3].results.map(withAvatar), blocked: results[4].results.map(withAvatar),
+    inbox: results[2].results.map(row => withAvatar(c, row)), history: results[3].results.map(row => withAvatar(c, row)), blocked: results[4].results.map(row => withAvatar(c, row)),
     received: results[5].results[0]?.count ?? 0 });
 });
 
@@ -195,12 +332,13 @@ app.get("/api/history/:handle", async c => {
   args.push(historyPageSize + 1);
   const rows = (await sql(c, `SELECT k.id,CASE WHEN k.sender=? THEN q.handle ELSE p.handle END AS handle,
       CASE WHEN k.sender=? THEN ru.name ELSE su.name END AS name,
+      CASE WHEN k.sender=? THEN q.avatar_key ELSE p.avatar_key END AS avatar_key,
       CASE WHEN k.sender=? THEN ru.image ELSE su.image END AS image,k.created_at,k.sender=? AS outgoing
       FROM pokes k JOIN profiles p ON p.user_id=k.sender JOIN profiles q ON q.user_id=k.recipient
       JOIN user su ON su.id=k.sender JOIN user ru ON ru.id=k.recipient
       WHERE ((k.sender=? AND k.recipient=?) OR (k.sender=? AND k.recipient=?))${condition}
-      ORDER BY k.created_at DESC,k.id DESC LIMIT ?`, uid(c), uid(c), uid(c), uid(c), ...args).all()).results as Record<string, unknown>[];
-  const history = rows.slice(0, historyPageSize).map(withAvatar);
+      ORDER BY k.created_at DESC,k.id DESC LIMIT ?`, uid(c), uid(c), uid(c), uid(c), uid(c), ...args).all()).results as Record<string, unknown>[];
+  const history = rows.slice(0, historyPageSize).map(row => withAvatar(c, row));
   const last = history[history.length - 1];
   return c.json({ history, next_cursor: rows.length > historyPageSize && last ? encodeHistoryCursor({ createdAt: Number(last.created_at), id: String(last.id) }) : null });
 });
@@ -376,7 +514,8 @@ export default {
       if(job.expiresAt<Date.now()){message.ack();continue;}
       try{
         if (!env.EMAIL) throw new Error("EMAIL is required");
-        await env.EMAIL.send({from:env.MAIL_FROM,to:job.email,subject:"Your Pokachy sign-in code",text:`Your Pokachy code is ${job.otp}. It expires in 5 minutes. If you did not request it, ignore this email.`,html:`<p>Your Pokachy sign-in code:</p><h1>${job.otp}</h1><p>Expires in 5 minutes. If you did not request it, ignore this email.</p>`});
+        const purpose=job.type==="change-email"?"email change":job.type==="email-verification"?"verification":job.type==="forget-password"?"password reset":"sign-in";
+        await env.EMAIL.send({from:env.MAIL_FROM,to:job.email,subject:`Your Pokachy ${purpose} code`,text:`Your Pokachy ${purpose} code is ${job.otp}. It expires in 5 minutes. If you did not request it, ignore this email.`,html:`<p>Your Pokachy ${purpose} code:</p><h1>${job.otp}</h1><p>Expires in 5 minutes. If you did not request it, ignore this email.</p>`});
         message.ack();
       }catch{message.retry({delaySeconds:15});console.warn(JSON.stringify({event:"email_delivery_retry"}));}
     }

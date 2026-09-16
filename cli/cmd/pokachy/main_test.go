@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -40,6 +41,38 @@ func TestValidServer(t *testing.T) {
 	}
 }
 
+func TestAccountHandoffAuthenticatesAndValidatesTheReturnedURL(t *testing.T) {
+	token := strings.Repeat("ab", 32)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/account/handoff" || r.Header.Get("Authorization") != "Bearer fixture-token" {
+			t.Errorf("unexpected handoff request: %s %s %#v", r.Method, r.URL.Path, r.Header)
+		}
+		var body map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["action"] != "email" {
+			t.Errorf("action = %q", body["action"])
+		}
+		_, _ = io.WriteString(w, `{"url":"`+serverURLForTest(r)+`/account#handoff=`+token+`&action=email"}`)
+	}))
+	defer server.Close()
+	c := &Client{Config: Config{Server: server.URL, Token: "fixture-token"}, HTTP: server.Client()}
+	got, err := c.accountHandoff(context.Background(), "email")
+	if err != nil || got != server.URL+"/account#handoff="+token+"&action=email" {
+		t.Fatalf("handoff URL = %q, %v", got, err)
+	}
+
+	evil := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"url":"https://attacker.test/account#handoff=`+token+`&action=email"}`)
+	}))
+	defer evil.Close()
+	c = &Client{Config: Config{Server: evil.URL, Token: "fixture-token"}, HTTP: evil.Client()}
+	if _, err := c.accountHandoff(context.Background(), "email"); err == nil {
+		t.Fatal("cross-origin account link was accepted")
+	}
+}
+
+func serverURLForTest(r *http.Request) string { return "http://" + r.Host }
+
 func TestHistoryEncodesCursorAndKeepsDirectionAndImage(t *testing.T) {
 	cursor := "opaque+/=&cursor"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,6 +92,39 @@ func TestHistoryEncodesCursorAndKeepsDirectionAndImage(t *testing.T) {
 	}
 	if len(page.History) != 1 || page.History[0].Outgoing != 1 || page.History[0].Image != "https://avatars.githubusercontent.com/u/9919?v=4" || page.NextCursor == nil || *page.NextCursor != "older" {
 		t.Fatalf("unexpected history: %+v", page)
+	}
+}
+
+func TestUploadProfileImageValidatesAndSendsFile(t *testing.T) {
+	png := []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/profile/image" || r.Method != http.MethodPut {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer fixture-token" || r.Header.Get("Content-Type") != "image/png" {
+			t.Errorf("unexpected headers: %#v", r.Header)
+		}
+		body, _ := io.ReadAll(r.Body)
+		if string(body) != string(png) {
+			t.Errorf("body = %v, want %v", body, png)
+		}
+		_, _ = io.WriteString(w, `{"ok":true}`)
+	}))
+	defer server.Close()
+	c := &Client{Config: Config{Server: server.URL, Token: "fixture-token"}, HTTP: server.Client()}
+	path := filepath.Join(t.TempDir(), "avatar.png")
+	if err := os.WriteFile(path, png, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.uploadProfileImage(context.Background(), path); err != nil {
+		t.Fatal(err)
+	}
+	bad := filepath.Join(t.TempDir(), "avatar.svg")
+	if err := os.WriteFile(bad, []byte(`<svg/>`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.uploadProfileImage(context.Background(), bad); err == nil || !strings.Contains(err.Error(), "PNG") {
+		t.Fatalf("invalid image error = %v", err)
 	}
 }
 
