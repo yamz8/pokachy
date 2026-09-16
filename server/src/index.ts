@@ -86,12 +86,12 @@ app.use("*", async (c, next) => {
   if (!isLocal(c.env)) c.header("Strict-Transport-Security", "max-age=31536000");
 });
 
-app.get("/api/config", c => c.json({ local: isLocal(c.env), github: !!(c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET), turnstileSiteKey: c.env.TURNSTILE_SITE_KEY, version: "0.1.7" }));
+app.get("/api/config", c => c.json({ local: isLocal(c.env), github: !!(c.env.GITHUB_CLIENT_ID && c.env.GITHUB_CLIENT_SECRET), turnstileSiteKey: c.env.TURNSTILE_SITE_KEY, version: "0.1.9" }));
 app.get("/health", async c => {
   c.header("Cache-Control", "no-store");
   try {
     await c.env.DB.prepare("SELECT 1").first();
-    return c.json({ status: "ok", version: "0.1.7", revision: c.env.DEPLOY_REVISION ?? "unversioned" });
+    return c.json({ status: "ok", version: "0.1.9", revision: c.env.DEPLOY_REVISION ?? "unversioned" });
   } catch {
     return c.json({ status: "unavailable" }, 503);
   }
