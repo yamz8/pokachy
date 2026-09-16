@@ -2,26 +2,26 @@
 
 Pokachy is not declared ready for a broad public launch by this document. It records what is published, the checks that can be repeated safely, and the operational work that still needs an owner.
 
-## Published release
+## Release to distribute
 
-`v0.1.8` was published on 2026-09-15 from commit `abc664a604392c3ba29272690a1eed4684f40eac` (the tagged `main` commit). Production was verified at that same revision. Its published Linux assets are:
+Use [v0.1.9](https://github.com/yamz8/pokachy/releases/tag/v0.1.9), the patch release containing the Omarchy CLI PATH fallback. The tag identifies the release commit; production deployment is a separate workflow whose exact revision must pass `npm run verify:live`.
 
-| Architecture | Asset | SHA-256 |
-| --- | --- | --- |
-| amd64 | `pokachy_linux_amd64.tar.gz` | `061d3ff367c133f824d8eca17ec1870e52e31cce165a0f7ee98a106d4ce7f0cd` |
-| arm64 | `pokachy_linux_arm64.tar.gz` | `af4d8e5bac50d8801d090a9fc0cb4d7080ee41f37fa3330976c6822473a63873` |
+| Architecture | Asset |
+| --- | --- |
+| amd64 | `pokachy_linux_amd64.tar.gz` |
+| arm64 | `pokachy_linux_arm64.tar.gz` |
 
-Download the archive and `SHA256SUMS` from the [v0.1.8 GitHub release](https://github.com/yamz8/pokachy/releases/tag/v0.1.8), then verify the downloaded file before extracting it:
+Download the archive and `SHA256SUMS` from that release, then verify the downloaded file before extracting it:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing
 tar -xzf pokachy_linux_amd64.tar.gz
-cd pokachy_0.1.8_linux_amd64
+cd pokachy_0.1.9_linux_amd64
 bash scripts/install.sh
 pokachy version
 ```
 
-Use the `arm64` filename on ARM Linux. The recorded amd64 artifact was isolated-install verified; arm64 was cross-build and content verified, not executed on ARM hardware. Re-check the release's `SHA256SUMS` before every install; copied checksums in this document are release records, not a substitute for verifying the downloaded manifest.
+Use the `arm64` filename on ARM Linux. ARM is cross-build and content verified, not executed on ARM hardware. Always use the release's checksum manifest; the dated evidence below describes which live user flows were exercised before this patch release.
 
 ## Readiness check — 2026-09-16 (Israel)
 
@@ -29,11 +29,11 @@ Use the `arm64` filename on ARM Linux. The recorded amd64 artifact was isolated-
 - CI, release, and production deployment succeeded for `abc664a`; the read-only smoke check verified that exact deployed revision and all seven public checks. The local Omarchy fix subsequently passed all seven stages of `npm run verify` (report started `2026-09-15T23:54:24Z`, exit 0, 16 Worker tests).
 - The live browser rendered sign-in, installation, privacy, support, and the signed-out deletion page. The install page's Omarchy copy control worked; installation and support layouts had no horizontal overflow at 390px. This does not establish email delivery, GitHub consent, or authenticated deletion.
 - A separate live email sign-in succeeded using an owner-authorized inbox and a received code. Handle creation, matching device-code approval, and CLI connection all completed. The embedded browser's Turnstile frame initially failed, then passed automatically after one reload. GitHub consent was not re-tested.
-- A local, unpublished Omarchy fix adds `~/.local/bin` as a fallback for CLI processes while preserving custom PATH precedence. A disposable Quickshell process fixture verified fallback, precedence, and literal argument handling. The full QML parsed and passed Omarchy manifest validation; the fixture did not render the complete installed panel.
+- The Omarchy fix included in v0.1.9 adds `~/.local/bin` as a fallback for CLI processes while preserving custom PATH precedence. A disposable Quickshell process fixture verified fallback, precedence, and literal argument handling. The full QML parsed and passed Omarchy manifest validation; the fixture did not render the complete installed panel.
 - Two explicitly authorized production accounts accepted a friendship and exchanged pokes with the published `0.1.8` CLI. A temporary companion daemon displayed a real Omarchy toast, visually inspected in a private capture. The return poke reached the existing account while its quiet setting stayed enabled. The installed desktop daemon was active/running with zero automatic restarts. This was two accounts on one physical desktop; historical two-desktop checks are recorded in `docs/handoff.md`.
 - A fresh disposable local SQL recovery exercise passed on 2026-09-15 UTC, including restored-session revocation, re-deletion, and zero foreign-key violations. Evidence: `artifacts/recovery-rehearsal.json`. Hosted Worker rollback and D1 Time Travel remain untested here.
 
-The fresh two-account smoke test passed on one physical Omarchy desktop. Publish the reviewed Omarchy fix before inviting users who need its PATH fallback. A fresh install on a second physical desktop remains a useful pilot check. Keep test inboxes and credentials out of this public record.
+The fresh two-account smoke test passed on one physical Omarchy desktop. Use v0.1.9 for users who need its PATH fallback. A fresh install on a second physical desktop remains a useful pilot check. Keep test inboxes and credentials out of this public record.
 
 ## Invite-only pilot
 
