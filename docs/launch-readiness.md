@@ -4,24 +4,36 @@ Pokachy is not declared ready for a broad public launch by this document. It rec
 
 ## Published release
 
-`v0.1.5` was published on 2026-09-13 from commit `2a94f7d5413bc99a31b6b96e88d24c374cb27dbc` (the tagged `main` commit). Its published Linux assets are:
+`v0.1.8` was published on 2026-09-15 from commit `abc664a604392c3ba29272690a1eed4684f40eac` (the tagged `main` commit). Production was verified at that same revision. Its published Linux assets are:
 
 | Architecture | Asset | SHA-256 |
 | --- | --- | --- |
-| amd64 | `pokachy_0.1.5_linux_amd64.tar.gz` | `487c00b863c1a34affc635121aa0c52a946614b3855486ea7c5429f557a9f04a` |
-| arm64 | `pokachy_0.1.5_linux_arm64.tar.gz` | `12a4ade21b25b9875d19232cdccafee5fd48713b982a0f73944be43b4eaca3e4` |
+| amd64 | `pokachy_linux_amd64.tar.gz` | `061d3ff367c133f824d8eca17ec1870e52e31cce165a0f7ee98a106d4ce7f0cd` |
+| arm64 | `pokachy_linux_arm64.tar.gz` | `af4d8e5bac50d8801d090a9fc0cb4d7080ee41f37fa3330976c6822473a63873` |
 
-Download the archive and `SHA256SUMS` from the [v0.1.5 GitHub release](https://github.com/yamz8/pokachy/releases/tag/v0.1.5), then verify the downloaded file before extracting it:
+Download the archive and `SHA256SUMS` from the [v0.1.8 GitHub release](https://github.com/yamz8/pokachy/releases/tag/v0.1.8), then verify the downloaded file before extracting it:
 
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing
-tar -xzf pokachy_0.1.5_linux_amd64.tar.gz
-cd pokachy_0.1.5_linux_amd64
+tar -xzf pokachy_linux_amd64.tar.gz
+cd pokachy_0.1.8_linux_amd64
 bash scripts/install.sh
 pokachy version
 ```
 
 Use the `arm64` filename on ARM Linux. The recorded amd64 artifact was isolated-install verified; arm64 was cross-build and content verified, not executed on ARM hardware. Re-check the release's `SHA256SUMS` before every install; copied checksums in this document are release records, not a substitute for verifying the downloaded manifest.
+
+## Readiness check — 2026-09-16 (Israel)
+
+- The public bootstrap at `https://pokachy.com/install.sh` downloaded, checksum-verified, and installed the published `0.1.8` amd64 CLI into disposable directories. No desktop service or account was changed. Evidence: `artifacts/public-install-verification.json` (ignored local report).
+- CI, release, and production deployment succeeded for `abc664a`; the read-only smoke check verified that exact deployed revision and all seven public checks. The local Omarchy fix subsequently passed all seven stages of `npm run verify` (report started `2026-09-15T23:54:24Z`, exit 0, 16 Worker tests).
+- The live browser rendered sign-in, installation, privacy, support, and the signed-out deletion page. The install page's Omarchy copy control worked; installation and support layouts had no horizontal overflow at 390px. This does not establish email delivery, GitHub consent, or authenticated deletion.
+- A separate live email sign-in succeeded using an owner-authorized inbox and a received code. Handle creation, matching device-code approval, and CLI connection all completed. The embedded browser's Turnstile frame initially failed, then passed automatically after one reload. GitHub consent was not re-tested.
+- A local, unpublished Omarchy fix adds `~/.local/bin` as a fallback for CLI processes while preserving custom PATH precedence. A disposable Quickshell process fixture verified fallback, precedence, and literal argument handling. The full QML parsed and passed Omarchy manifest validation; the fixture did not render the complete installed panel.
+- Two explicitly authorized production accounts accepted a friendship and exchanged pokes with the published `0.1.8` CLI. A temporary companion daemon displayed a real Omarchy toast, visually inspected in a private capture. The return poke reached the existing account while its quiet setting stayed enabled. The installed desktop daemon was active/running with zero automatic restarts. This was two accounts on one physical desktop; historical two-desktop checks are recorded in `docs/handoff.md`.
+- A fresh disposable local SQL recovery exercise passed on 2026-09-15 UTC, including restored-session revocation, re-deletion, and zero foreign-key violations. Evidence: `artifacts/recovery-rehearsal.json`. Hosted Worker rollback and D1 Time Travel remain untested here.
+
+The fresh two-account smoke test passed on one physical Omarchy desktop. Publish the reviewed Omarchy fix before inviting users who need its PATH fallback. A fresh install on a second physical desktop remains a useful pilot check. Keep test inboxes and credentials out of this public record.
 
 ## Invite-only pilot
 
@@ -35,7 +47,7 @@ Before widening the pilot, review support volume, delivery failures, reports, ac
 
 On 2026-09-14, the enabled Cloudflare policy **Pokachy infrastructure incidents** was configured for minor, major, and critical incidents affecting Workers, Workers Assets, D1, Durable Objects, Queues, Email Routing, Email Sending, Authoritative DNS, and DNS Updates. Its recipient is the owner's designated private operations inbox. The policy was read back successfully, Cloudflare accepted its test notification, and the owner confirmed the test email arrived. This covers Cloudflare-reported infrastructure incidents; it does not detect Pokachy's own application errors, queue backlog, or delivery failures.
 
-Once merged into the default branch, `.github/workflows/monitor.yml` runs the existing `scripts/verify-live.py` every 30 minutes and can also be dispatched manually. It makes only unauthenticated public HTTPS requests to `https://pokachy.com`; it creates no account, email, poke, deployment, secret, or Cloudflare API request. Each run writes and retains `artifacts/live-verification.json` as a GitHub Actions artifact for 30 days. GitHub schedules may be delayed; this is a basic smoke monitor, not a real-time availability guarantee.
+The default branch includes `.github/workflows/monitor.yml`, scheduled every 30 minutes and also available for manual dispatch. Its [scheduled run on 2026-09-15 at 22:12 UTC](https://github.com/yamz8/pokachy/actions/runs/35029733866) succeeded, as did the preceding two observed scheduled runs. It invokes `scripts/verify-live.py`. It makes only unauthenticated public HTTPS requests to `https://pokachy.com`; it creates no account, email, poke, deployment, secret, or Cloudflare API request. Each run writes and retains `artifacts/live-verification.json` as a GitHub Actions artifact for 30 days. GitHub schedules may be delayed; this is a basic smoke monitor, not a real-time availability guarantee.
 
 The workflow fails when health, public configuration, production development-mail isolation, unauthenticated access control, homepage, or public assets fail. It uses no production secrets and has only `contents: read` permission. A scheduled failure should produce the normal GitHub Actions workflow-failure notification for watchers/subscribers whose GitHub notification settings allow it. Configure and test those notifications for the operations owner; GitHub workflow notifications and a retained report are not a substitute for independently configured external paging or alerting.
 
@@ -45,7 +57,7 @@ On a monitor failure, download the report, compare it with the prior successful 
 
 Run `python3 scripts/rehearse-recovery.py` for the disposable local SQL exercise. It uses the real initial schema, backs up synthetic account/session records, demonstrates how restore resurrects deleted data, then reapplies deletion and session revocation. Its fresh report is `artifacts/recovery-rehearsal.json`. This does not exercise Cloudflare Worker version rollback or D1 Time Travel; the hosted rehearsal below remains separate.
 
-The repository has deployment recovery metadata and a documented rollback path, but no recovery rehearsal is recorded here. Rehearse only in an isolated disposable environment or against a deliberately selected non-production Worker and database. Never restore the production D1 database, use real inboxes, or suspend real accounts for a rehearsal.
+The repository has deployment recovery metadata and a documented rollback path. The disposable local SQL rehearsal passed on 2026-09-15 UTC; a hosted rollback/Time Travel rehearsal has not been recorded. Rehearse only in an isolated disposable environment or against a deliberately selected non-production Worker and database. Never restore the production D1 database, use real inboxes, or suspend real accounts for a rehearsal.
 
 1. Create disposable test accounts and an isolated Worker/D1/queue configuration with private test inboxes or the local development mail path.
 2. Deploy a known-compatible revision, record its version ID and a D1 recovery point, then make an additive test change that has a documented rollback path.
@@ -56,9 +68,9 @@ The repository has deployment recovery metadata and a documented rollback path, 
 ## Outstanding launch gates
 
 - The owner receives verified Cloudflare infrastructure incident alerts. Add application-specific alerts for Worker availability/errors, D1 errors and capacity, queue depth/retries, dead-letter queue growth, email-delivery failures, domain expiry, and Cloudflare/GitHub billing or quota events. Those separate rules are not yet configured. Inspection of the available Workers Observability dashboard and API did not expose a rule-creation control; a notification policy alone would not establish an application-error trigger.
-- Test that the GitHub Actions failure notification reaches the responsible operator. The scheduled workflow is added here but has not been observed running in this change.
+- Test that the GitHub Actions failure notification reaches the responsible operator. Scheduled smoke runs have been observed succeeding; failure-notification delivery has not been verified.
 - Complete the isolated recovery rehearsal above and keep the result with the deployment record.
 - Complete positive report, moderation, suspension, and session-revocation validation only with disposable accounts explicitly authorized for that purpose.
-- Deploy and review the implemented privacy/support/deletion pages and moderation procedures in `docs/deployment.md`. Support forwarding and inbox delivery are verified; operational alert configuration and delivery remain separate outstanding checks.
+- Complete live authenticated account-deletion and moderation validation with authorized disposable accounts. Privacy/support/deletion pages are deployed and were reviewed in the browser; support forwarding and inbox delivery were previously verified. Operational alert configuration and delivery remain separate outstanding checks.
 - Recruit the first explicitly invited pilot cohort and confirm that its agreed support route works before distributing the published release.
 - Re-test live OAuth consent, email delivery, inbox delivery, and desktop notifications for the intended pilot environment. The read-only smoke monitor cannot prove them.

@@ -58,7 +58,7 @@ The packaged installer installs the command at `~/.local/bin/pokachy`, a user se
 
 ## PATH and notifications
 
-Open a new terminal after installation. If `pokachy` is not found, ensure `~/.local/bin` is on your `PATH`:
+Open a new terminal after installation. If `pokachy` is not found, ensure `~/.local/bin` is on your `PATH`. The Omarchy panel checks this install location itself while preserving any existing desktop `PATH` entries:
 
 ```sh
 export PATH="$HOME/.local/bin:$PATH"
