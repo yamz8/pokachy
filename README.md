@@ -38,7 +38,7 @@ For manual downloads, checksum verification, PATH and systemd help, upgrades, re
 
 ## Say hey
 
-Account settings include device revocation. You can also access [account deletion](https://pokachy.com/delete-account.html), [privacy information](https://pokachy.com/privacy.html), and [support](https://pokachy.com/support.html). Deletion requires a recent sign-in, an email code, and explicit confirmation. Local uninstall does not delete your server account.
+Account settings let you change your handle, display name, profile picture, and verified email; link GitHub; and revoke devices. You can also access [account deletion](https://pokachy.com/delete-account.html), [privacy information](https://pokachy.com/privacy.html), and [support](https://pokachy.com/support.html). Deletion requires a recent sign-in, an email code, and explicit confirmation. Local uninstall does not delete your server account.
 
 ```sh
 pokachy friends add @friend
@@ -52,7 +52,13 @@ pokachy quiet off
 pokachy block @person
 pokachy report @person "Reason for this report"
 pokachy account
+pokachy account github
+pokachy account email
+pokachy profile name "Display Name"
+pokachy profile image /path/to/avatar.png
 ```
+
+Account commands create a five-minute, single-use browser handoff tied to the CLI's signed-in account. If the browser is signed in as someone else, Pokachy refuses the handoff without changing either account.
 
 Only mutual friends can poke. There is one outstanding poke per direction and a ten-second cooldown. Replying clears the poke you received. Quiet mode preserves the inbox while suppressing notifications. `pokachy help` lists commands; `--json` supports automation.
 

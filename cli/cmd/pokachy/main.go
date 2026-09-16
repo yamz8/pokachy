@@ -30,7 +30,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.1.9"
+const version = "0.2.0"
 
 const omarchyPluginURL = "https://github.com/yamz8/pokachy-omarchy.git"
 const bootstrapInstallerURL = "https://github.com/yamz8/pokachy/releases/latest/download/install.sh"
@@ -57,12 +57,15 @@ type Poke struct {
 	Outgoing  int    `json:"outgoing"`
 }
 type Me struct {
-	ID     string `json:"id"`
-	Handle string `json:"handle"`
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Image  string `json:"image"`
-	Quiet  bool   `json:"quiet"`
+	ID              string `json:"id"`
+	Handle          string `json:"handle"`
+	Name            string `json:"name"`
+	Email           string `json:"email"`
+	Image           string `json:"image"`
+	CustomImage     bool   `json:"customImage"`
+	Quiet           bool   `json:"quiet"`
+	GitHubAvailable bool   `json:"githubAvailable"`
+	GitHubLinked    bool   `json:"githubLinked"`
 }
 type State struct {
 	Me         Me       `json:"me"`
@@ -203,6 +206,17 @@ func sameOrigin(a, b *url.URL) bool {
 	return port(a) == port(b)
 }
 func (c *Client) request(ctx context.Context, method, path string, body any, output any, key string) error {
+	var reader io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		reader = strings.NewReader(string(data))
+	}
+	return c.requestBody(ctx, method, path, reader, "application/json", output, key)
+}
+func (c *Client) requestBody(ctx context.Context, method, path string, body io.Reader, contentType string, output any, key string) error {
 	base, err := serverURL(c.Config.Server)
 	if err != nil {
 		return err
@@ -214,21 +228,13 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 	if err != nil || relative.IsAbs() || relative.Host != "" || relative.Fragment != "" {
 		return errors.New("invalid API path")
 	}
-	var reader io.Reader
-	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		reader = strings.NewReader(string(data))
-	}
 	target := base.ResolveReference(relative)
 	// Query values are encoded by callers; absolute origins and fragments are rejected.
-	req, err := http.NewRequestWithContext(ctx, method, target.String(), reader)
+	req, err := http.NewRequestWithContext(ctx, method, target.String(), body)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("X-Pokachy-Client", "cli")
 	req.Header.Set("User-Agent", "Pokachy/"+version)
 	if c.Config.Token != "" {
@@ -286,6 +292,43 @@ func (c *Client) request(ctx context.Context, method, path string, body any, out
 	}
 	return nil
 }
+func profileImageContentType(header []byte) string {
+	if len(header) >= 12 && string(header[4:8]) == "ftyp" && (string(header[8:12]) == "avif" || string(header[8:12]) == "avis") {
+		return "image/avif"
+	}
+	typeName := http.DetectContentType(header)
+	if typeName == "image/png" || typeName == "image/jpeg" || typeName == "image/webp" {
+		return typeName
+	}
+	return ""
+}
+func (c *Client) uploadProfileImage(ctx context.Context, path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("could not open profile image: %w", err)
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > 2*1024*1024 {
+		return errors.New("profile image must be a PNG, JPEG, WebP, or AVIF file no larger than 2 MB")
+	}
+	header := make([]byte, 512)
+	read, err := io.ReadFull(file, header)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return err
+	}
+	contentType := profileImageContentType(header[:read])
+	if contentType == "" {
+		return errors.New("profile image must be a PNG, JPEG, WebP, or AVIF file")
+	}
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return c.requestBody(ctx, "PUT", "/api/profile/image", file, contentType, nil, "")
+}
 func (c *Client) sync(ctx context.Context) (State, error) {
 	var s State
 	err := c.request(ctx, "GET", "/api/state", nil, &s, "")
@@ -315,6 +358,31 @@ func (c *Client) history(ctx context.Context, handle, before string) (HistoryPag
 		return page, err
 	}
 	return page, nil
+}
+
+func (c *Client) accountHandoff(ctx context.Context, action string) (string, error) {
+	var result struct {
+		URL string `json:"url"`
+	}
+	if err := c.request(ctx, http.MethodPost, "/api/account/handoff", map[string]string{"action": action}, &result, ""); err != nil {
+		return "", err
+	}
+	base, err := serverURL(c.Config.Server)
+	if err != nil {
+		return "", err
+	}
+	target, err := url.Parse(result.URL)
+	if err != nil || !target.IsAbs() || target.User != nil || !sameOrigin(base, target) || target.Path != "/account" || target.RawQuery != "" {
+		return "", errors.New("Pokachy returned an invalid account link")
+	}
+	fragment, err := url.ParseQuery(target.Fragment)
+	if err != nil || fragment.Get("action") != action || len(fragment.Get("handoff")) != 64 || len(fragment) != 2 {
+		return "", errors.New("Pokachy returned an invalid account link")
+	}
+	if _, err = hex.DecodeString(fragment.Get("handoff")); err != nil {
+		return "", errors.New("Pokachy returned an invalid account link")
+	}
+	return target.String(), nil
 }
 
 func notificationIcon() string {
@@ -359,8 +427,11 @@ func help() {
   pokachy quiet on|off
   pokachy block @person | unblock @person
   pokachy report @person "reason"
-  pokachy profile HANDLE
-  pokachy account                 Open account and device settings
+  pokachy profile handle HANDLE
+  pokachy profile name DISPLAY_NAME
+  pokachy profile update HANDLE DISPLAY_NAME
+  pokachy profile image PATH|remove
+  pokachy account [github|email]  Open account settings or manage sign-in details
   pokachy status [--json]         Read the local companion status
   pokachy watch --json            Stream local status changes
   pokachy daemon                 Receive desktop notifications
@@ -551,9 +622,42 @@ func run(args []string) error {
 		if err = need(2); err != nil {
 			return err
 		}
-		path = "/api/profile"
-		method = "PUT"
-		body = map[string]any{"handle": strings.TrimPrefix(args[1], "@")}
+		switch args[1] {
+		case "handle":
+			if len(args) != 3 {
+				return errors.New("use profile handle HANDLE")
+			}
+			path, method = "/api/profile", "PUT"
+			body = map[string]any{"handle": strings.TrimPrefix(args[2], "@")}
+		case "name":
+			if len(args) < 3 {
+				return errors.New("use profile name DISPLAY_NAME")
+			}
+			path, method = "/api/profile", "PUT"
+			body = map[string]any{"name": strings.Join(args[2:], " ")}
+		case "update":
+			if len(args) != 4 {
+				return errors.New("use profile update HANDLE DISPLAY_NAME")
+			}
+			path, method = "/api/profile", "PUT"
+			body = map[string]any{"handle": strings.TrimPrefix(args[2], "@"), "name": args[3]}
+		case "image":
+			if len(args) != 3 {
+				return errors.New("use profile image PATH|remove")
+			}
+			if args[2] == "remove" {
+				path, method = "/api/profile/image", "DELETE"
+			} else if err = c.uploadProfileImage(ctx, args[2]); err != nil {
+				return err
+			}
+		default:
+			// Keep the original `pokachy profile HANDLE` spelling working.
+			if len(args) != 2 {
+				return errors.New("use profile handle HANDLE, profile name DISPLAY_NAME, or profile image PATH|remove")
+			}
+			path, method = "/api/profile", "PUT"
+			body = map[string]any{"handle": strings.TrimPrefix(args[1], "@")}
+		}
 	case "block", "unblock":
 		if err = need(2); err != nil {
 			return err
@@ -569,7 +673,18 @@ func run(args []string) error {
 		path = "/api/reports/" + url.PathEscape(strings.TrimPrefix(args[1], "@"))
 		body = map[string]any{"reason": strings.Join(args[2:], " ")}
 	case "account":
-		return openBrowser(c.Config.Server + "/account")
+		intent := "account"
+		if len(args) == 2 {
+			intent = args[1]
+		}
+		if len(args) > 2 || (intent != "account" && intent != "github" && intent != "email") {
+			return errors.New("use account, account github, or account email")
+		}
+		target, buildErr := c.accountHandoff(ctx, intent)
+		if buildErr != nil {
+			return buildErr
+		}
+		return openBrowser(target)
 	case "logout":
 		if err = c.request(ctx, "POST", "/api/auth/sign-out", body, nil, ""); err != nil {
 			var apiErr *APIError

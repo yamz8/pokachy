@@ -10,7 +10,7 @@ GitHub OAuth callback: `https://pokachy.com/api/auth/callback/github`. The CLI u
 
 ## Resources
 
-Production requires D1 database `pokachy`, Durable Object `UserHub`, queues `pokachy-mail` and `pokachy-mail-failed`, and Email Sending enabled for `pokachy.com`. Bind email as `EMAIL` and the producer queue as `MAIL_QUEUE`.
+Production requires D1 database `pokachy`, R2 bucket `pokachy-avatars`, Durable Object `UserHub`, queues `pokachy-mail` and `pokachy-mail-failed`, and Email Sending enabled for `pokachy.com`. Bind the bucket as `AVATARS`, email as `EMAIL`, and the producer queue as `MAIL_QUEUE`. Create and verify the R2 bucket before deploying code that serves profile uploads; a dry run does not create it.
 
 For another account, create these resources with the project's Wrangler, replace account/database IDs in the configuration, and onboard the sending domain. Verify DNS before testing with a real inbox you control.
 
@@ -89,7 +89,7 @@ The updated account deletion page requires a session created within five minutes
 
 Deletion removes sessions, linked accounts, profile, friendships, blocks, shared poke history, reports involving the account, associated device codes, and current known email OTP records. Friends are asked to refresh and live sockets are revalidated. Existing queued emails, provider logs, recovery history, and offline desktop caches are not remotely erased. A newly registered account can reuse a deleted handle; deletion is not a permanent identity ban. Reports have no independent archive after an involved account is deleted.
 
-An hourly production Cron Trigger runs bounded cleanup of expired sessions, verification records, device codes, and local development mail; inactive authentication rate-limit rows become eligible after 24 hours. Each category removes at most 1,000 rows per run. Investigate cleanup failures or backlogs using `expired_auth_cleanup` events. Poke history and resolved reports have no automatic age-based deletion; the public privacy page states that policy.
+An hourly production Cron Trigger runs bounded cleanup of expired sessions, verification records, device codes, account handoffs, and local development mail; inactive authentication rate-limit rows become eligible after 24 hours. Each category removes at most 1,000 rows per run. Investigate cleanup failures or backlogs using `expired_auth_cleanup` events. Poke history and resolved reports have no automatic age-based deletion; the public privacy page states that policy.
 
 After restoring a database, previously deleted accounts and revoked sessions may reappear. Before reopening writes, identify and reapply deletions and moderation changes made after the recovery point, revoke restored sessions, and verify the result. Never treat a successful restore as permission to reactivate old credentials. If the necessary deletion/incident record is unavailable, keep the restored service isolated and escalate the recovery decision.
 

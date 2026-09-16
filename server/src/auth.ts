@@ -14,7 +14,8 @@ export function createAuth(env: AppEnv) {
     database: drizzleAdapter(drizzle(env.DB, { schema }), { provider: "sqlite", schema, transaction: false }),
     trustedOrigins: [env.BASE_URL],
     session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 },
-    account: { encryptOAuthTokens: true, accountLinking: { enabled: true, disableImplicitLinking: true, requireLocalEmailVerified: true, updateUserInfoOnLink: true } },
+    account: { encryptOAuthTokens: true, accountLinking: { enabled: true, disableImplicitLinking: true, requireLocalEmailVerified: true, allowDifferentEmails: true, updateUserInfoOnLink: true } },
+    onAPIError: { errorURL: "/account" },
     rateLimit: { enabled: true, storage: "database", window: 60, max: 60 },
     advanced: { useSecureCookies: !local, ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
     socialProviders: env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET ? {
@@ -25,8 +26,9 @@ export function createAuth(env: AppEnv) {
       deviceAuthorization({ verificationUri: `${env.BASE_URL}/activate`, validateClient: (id) => id === "pokachy-cli" }),
       emailOTP({
         otpLength: 6, expiresIn: 300, allowedAttempts: 5, storeOTP: "hashed",
-        async sendVerificationOTP({ email, otp }) {
-          const job: MailJob = { email, otp, expiresAt: Date.now() + 300_000 };
+        changeEmail: { enabled: true, verifyCurrentEmail: true },
+        async sendVerificationOTP({ email, otp, type }) {
+          const job: MailJob = { email, otp, type, expiresAt: Date.now() + 300_000 };
           if (local) {
             await env.DB.prepare("INSERT INTO dev_mail VALUES (?, ?, ?) ON CONFLICT(email) DO UPDATE SET otp=excluded.otp, expires_at=excluded.expires_at").bind(email, otp, job.expiresAt).run();
           } else {

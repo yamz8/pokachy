@@ -2,6 +2,8 @@ import { env } from "cloudflare:test";
 import { beforeAll, expect, test } from "vitest";
 import worker from "../src/index";
 import migration from "../migrations/0001_initial.sql?raw";
+import profileSettingsMigration from "../migrations/0002_profile_settings.sql?raw";
+import accountHandoffsMigration from "../migrations/0003_account_handoffs.sql?raw";
 
 const origin = "http://127.0.0.1:8787";
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
@@ -26,7 +28,7 @@ async function user(handle: string) {
   return data;
 }
 
-beforeAll(async () => { await env.DB.exec(migration); });
+beforeAll(async () => { await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); });
 
 test("administrators paginate and resolve reports, manage suspension, and unblock case-insensitively", async () => {
   const admin = await user("moderatoradmin");

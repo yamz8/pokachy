@@ -3,6 +3,8 @@ import { beforeAll, expect, test } from "vitest";
 import worker from "../src/index";
 import { cleanExpiredAuth } from "../src/retention";
 import migration from "../migrations/0001_initial.sql?raw";
+import profileSettingsMigration from "../migrations/0002_profile_settings.sql?raw";
+import accountHandoffsMigration from "../migrations/0003_account_handoffs.sql?raw";
 
 const origin = "http://127.0.0.1:8787";
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
@@ -32,7 +34,7 @@ async function deletionCode(token: string, email: string) {
 }
 const count = async (query: string, ...args: unknown[]) => Number((await env.DB.prepare(query).bind(...args).first<{ count: number }>())?.count ?? 0);
 
-beforeAll(async () => { await env.DB.exec(migration); });
+beforeAll(async () => { await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); });
 
 test("account deletion requires a recent verified, non-administrator session and confirmation", async () => {
   expect((await request("/api/account/delete", undefined, "POST", { confirmation: "DELETE MY ACCOUNT" })).status).toBe(401);
@@ -80,6 +82,9 @@ test("active and suspended accounts delete related records while preserving othe
   const peer = await user("deletepeer");
   const [a, b] = [owner.user.id, peer.user.id].sort();
   const now = Date.now();
+  const avatarKey = `avatars/${owner.user.id}/${crypto.randomUUID()}`;
+  await env.AVATARS.put(avatarKey, new Uint8Array([1, 2, 3]), { httpMetadata: { contentType: "image/png" } });
+  await env.DB.prepare("UPDATE profiles SET avatar_key=? WHERE user_id=?").bind(avatarKey, owner.user.id).run();
   const verificationIdentifiers = ["sign-in-otp", "email-verification-otp", "forget-password-otp", "change-email-otp"].map(kind => `${kind}-${owner.email}`);
   await env.DB.batch([
     env.DB.prepare("INSERT INTO friendships(a,b,requester,created_at) VALUES (?,?,?,?)").bind(a, b, owner.user.id, now),
@@ -89,6 +94,7 @@ test("active and suspended accounts delete related records while preserving othe
     env.DB.prepare("INSERT INTO reports(id,reporter,reported,reason,created_at) VALUES (?,?,?,?,?),(?,?,?,?,?)")
       .bind("owner-report", owner.user.id, peer.user.id, "Owner report", now, "peer-report", peer.user.id, owner.user.id, "Peer report", now),
     env.DB.prepare("INSERT INTO account(id,accountId,providerId,userId,createdAt,updatedAt) VALUES (?,?,?,?,?,?)").bind("owner-account", "owner", "test", owner.user.id, now, now),
+    env.DB.prepare("INSERT INTO account_handoffs(token_hash,user_id,action,expires_at,created_at) VALUES (?,?,?,?,?)").bind("a".repeat(64), owner.user.id, "account", now + 60_000, now),
     env.DB.prepare("INSERT INTO deviceCode(id,deviceCode,userCode,userId,expiresAt,status) VALUES (?,?,?,?,?,?)").bind("owner-device", "owner-device-code", "OWNERDEV", owner.user.id, now + 60_000, "pending"),
     ...verificationIdentifiers.map((identifier, index) => env.DB.prepare("INSERT INTO verification(id,identifier,value,expiresAt,createdAt,updatedAt) VALUES (?,?,?,?,?,?)")
       .bind(`owner-verification-${index}`, identifier, "value", now + 60_000, now, now)),
@@ -109,6 +115,7 @@ test("active and suspended accounts delete related records while preserving othe
   expect(await count("SELECT COUNT(*) AS count FROM profiles WHERE user_id=?", owner.user.id)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM session WHERE userId=?", owner.user.id)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM account WHERE userId=?", owner.user.id)).toBe(0);
+  expect(await count("SELECT COUNT(*) AS count FROM account_handoffs WHERE user_id=?", owner.user.id)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM deviceCode WHERE userId=?", owner.user.id)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM friendships WHERE a=? OR b=? OR requester=?", owner.user.id, owner.user.id, owner.user.id)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM blocks WHERE blocker=? OR blocked=?", owner.user.id, owner.user.id)).toBe(0);
@@ -116,6 +123,7 @@ test("active and suspended accounts delete related records while preserving othe
   expect(await count("SELECT COUNT(*) AS count FROM reports WHERE reporter=? OR reported=?", owner.user.id, owner.user.id)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM verification WHERE identifier IN (?,?,?,?)", ...verificationIdentifiers)).toBe(0);
   expect(await count("SELECT COUNT(*) AS count FROM dev_mail WHERE email=?", owner.email)).toBe(0);
+  expect(await env.AVATARS.get(avatarKey)).toBeNull();
   expect(await env.DB.prepare("SELECT 1 FROM user WHERE id=?").bind(peer.user.id).first()).not.toBeNull();
 
   const suspended = await user("deletesuspended");
@@ -143,6 +151,8 @@ test("expired authentication cleanup is bounded and leaves valid records intact"
     env.DB.prepare("INSERT INTO rateLimit(id,key,count,lastRequest) VALUES (?,?,?,?)").bind("valid-rate", "valid-rate", 1, now - 86_400_000),
     env.DB.prepare("INSERT INTO dev_mail(email,otp,expires_at) VALUES (?,?,?)").bind("expired-cleanup@example.test", "123456", now - 1),
     env.DB.prepare("INSERT INTO dev_mail(email,otp,expires_at) VALUES (?,?,?)").bind("valid-cleanup@example.test", "123456", now + 1),
+    env.DB.prepare("INSERT INTO account_handoffs(token_hash,user_id,action,expires_at,created_at) VALUES (?,?,?,?,?)").bind("b".repeat(64), userId, "account", now - 1, now),
+    env.DB.prepare("INSERT INTO account_handoffs(token_hash,user_id,action,expires_at,created_at) VALUES (?,?,?,?,?)").bind("c".repeat(64), userId, "email", now + 1, now),
   ]);
 
   await cleanExpiredAuth(env, now);
@@ -156,4 +166,6 @@ test("expired authentication cleanup is bounded and leaves valid records intact"
   expect(await env.DB.prepare("SELECT 1 FROM rateLimit WHERE id='valid-rate'").first()).not.toBeNull();
   expect(await env.DB.prepare("SELECT 1 FROM dev_mail WHERE email='expired-cleanup@example.test'").first()).toBeNull();
   expect(await env.DB.prepare("SELECT 1 FROM dev_mail WHERE email='valid-cleanup@example.test'").first()).not.toBeNull();
+  expect(await env.DB.prepare("SELECT 1 FROM account_handoffs WHERE token_hash=?").bind("b".repeat(64)).first()).toBeNull();
+  expect(await env.DB.prepare("SELECT 1 FROM account_handoffs WHERE token_hash=?").bind("c".repeat(64)).first()).not.toBeNull();
 });

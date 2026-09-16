@@ -87,6 +87,29 @@
           <code class="command"><span>$</span> pokachy poke @friend</code>
         </div>
         <button id="link-github" class="button secondary full" hidden><span>Link GitHub</span><b>↗</b></button>
+        <div class="account-email-row">
+          <span><strong>Account email</strong><small id="account-email"></small></span>
+          <button id="account-email-change" class="text-button" type="button">Change</button>
+        </div>
+        <div id="email-change-panel" class="email-change-panel" hidden>
+          <form id="email-change-current-form">
+            <p class="fine">First verify your current inbox. Your email will not change until the new inbox is verified too.</p>
+            <label for="new-account-email">New email</label>
+            <input id="new-account-email" type="email" autocomplete="email" maxlength="254" required placeholder="new@example.com">
+            <button id="email-change-current-send" class="button secondary full" type="button"><span>Send code to current email</span><b>→</b></button>
+            <button id="email-change-current-local" class="text-button" type="button" hidden>Fill the development code</button>
+            <label for="email-change-current-code">Code from current email</label>
+            <input id="email-change-current-code" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000">
+            <button class="button full" type="submit"><span>Verify and email the new address</span><b>→</b></button>
+          </form>
+          <form id="email-change-new-form" hidden>
+            <p class="fine">Enter the code sent to <strong id="pending-account-email"></strong>.</p>
+            <button id="email-change-new-local" class="text-button" type="button" hidden>Fill the development code</button>
+            <label for="email-change-new-code">Code from new email</label>
+            <input id="email-change-new-code" class="code-input" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="000000">
+            <button class="button full" type="submit"><span>Change email</span><b>✓</b></button>
+          </form>
+        </div>
         <button id="sessions-toggle" type="button" class="session-toggle" aria-expanded="false" aria-controls="sessions"><span><strong>Signed-in devices</strong><small>Review and revoke access</small></span><b id="sessions-icon">+</b></button>
         <div id="sessions" class="sessions" aria-live="polite" hidden></div>
       </div>

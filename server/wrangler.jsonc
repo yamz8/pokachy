@@ -14,6 +14,7 @@
     "MAIL_FROM": "Pokachy <hello@pokachy.com>", "ADMIN_USER_IDS": ""
   },
   "d1_databases": [{"binding": "DB", "database_name": "pokachy-local", "database_id": "00000000-0000-0000-0000-000000000001", "migrations_dir": "migrations"}],
+  "r2_buckets": [{"binding": "AVATARS", "bucket_name": "pokachy-avatars-local"}],
   "durable_objects": {"bindings": [{"name": "HUBS", "class_name": "UserHub"}]},
   "migrations": [{"tag": "v1", "new_sqlite_classes": ["UserHub"]}],
   "observability": {"enabled": true, "logs": {"enabled": true, "head_sampling_rate": 1}, "traces": {"enabled": true, "head_sampling_rate": 0.01}},
@@ -26,6 +27,7 @@
       "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>"},
       "routes": [{"pattern": "pokachy.com", "custom_domain": true}],
       "d1_databases": [{"binding": "DB", "database_name": "pokachy", "database_id": "0cd8e576-f169-42bb-b944-42b60ef5e44e", "migrations_dir": "migrations"}],
+      "r2_buckets": [{"binding": "AVATARS", "bucket_name": "pokachy-avatars"}],
       "durable_objects": {"bindings": [{"name": "HUBS", "class_name": "UserHub"}]},
       "send_email": [{"name": "EMAIL"}],
       "queues": {
