@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, beforeEach, expect, test, vi } from "vitest";
 import worker from "../src/index";
 import migration from "../migrations/0001_initial.sql?raw";
+import { version } from "../package.json";
 
 const origin = "http://127.0.0.1:8787";
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
@@ -220,7 +221,7 @@ test("health reports deployment identity and fails closed on database outage", a
   const response = await worker.fetch(new Request(origin + "/health"), { ...env, DEPLOY_REVISION: "test-revision" }, ctx);
   expect(response.status).toBe(200);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
-  expect(await response.json()).toEqual({ status: "ok", version: "0.1.7", revision: "test-revision" });
+  expect(await response.json()).toEqual({ status: "ok", version, revision: "test-revision" });
   const prepare = vi.spyOn(env.DB, "prepare").mockImplementation(() => { throw new Error("private database detail"); });
   try {
     const failed = await request("/health");
