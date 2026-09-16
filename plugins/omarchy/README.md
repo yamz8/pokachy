@@ -8,4 +8,6 @@ omarchy plugin add https://github.com/yamz8/pokachy-omarchy.git --enable
 ```
 
 The panel reads the CLI's local cache through `pokachy watch --json`. It does
-not read Pokachy credentials or session tokens.
+not read Pokachy credentials or session tokens. It keeps the desktop's
+existing `PATH` order and also checks `~/.local/bin`, where the packaged
+installer places `pokachy`.

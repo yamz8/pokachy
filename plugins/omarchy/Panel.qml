@@ -58,6 +58,16 @@ Panel {
   readonly property int inboxCount: pokachyState && pokachyState.inbox ? pokachyState.inbox.length : 0
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  // Quickshell's login environment can omit the CLI install directory. Keep
+  // its PATH first so custom installs still win, then fall back to the
+  // packaged per-user location.
+  readonly property string pokachyPath: {
+    var inherited = Quickshell.env("PATH") || ""
+    var home = Quickshell.env("HOME") || ""
+    var localBin = home === "" ? "" : home + "/.local/bin"
+    return localBin === "" ? inherited : (inherited === "" ? localBin : inherited + ":" + localBin)
+  }
+  readonly property var pokachyEnvironment: ({ "PATH": pokachyPath })
   readonly property var activeFriend: friendForHandle(activeFriendHandle)
   readonly property var activeIncomingPoke: inboxFor(activeFriend)
   readonly property var activePokeHistory: historyFor(activeFriend)
@@ -324,13 +334,16 @@ Panel {
     var today = Qt.formatDateTime(new Date(), "yyyy-MM-dd")
     return Qt.formatDateTime(date, "yyyy-MM-dd") === today ? "Today" : Qt.formatDateTime(date, "MMM d, yyyy")
   }
+  function pokachyCommand(args) {
+    return ["/usr/bin/env", "pokachy"].concat(args)
+  }
   function loadHistory() {
     if (!activeFriend || historyProc.running || (historyLoaded && historyCursor === ""))
       return
     historyRequestSession = historySession
     historyError = ""
     historyOutput = ""
-    var args = ["/usr/bin/env", "pokachy", "history", "@" + activeFriendHandle, "--json"]
+    var args = pokachyCommand(["history", "@" + activeFriendHandle, "--json"])
     if (historyLoaded && historyCursor !== "")
       args = args.concat(["--before", historyCursor])
     historyProc.command = args
@@ -393,7 +406,7 @@ Panel {
   }
   function refresh() {
     if (!statusProc.running) {
-      statusProc.command = ["/usr/bin/env", "pokachy", "status", "--json"]
+      statusProc.command = pokachyCommand(["status", "--json"])
       statusProc.running = true
     }
   }
@@ -406,7 +419,7 @@ Panel {
     actionLabel = label
     actionKey = args.join(":")
     retryArgs = args.slice()
-    actionProc.command = ["/usr/bin/env", "pokachy"].concat(args)
+    actionProc.command = pokachyCommand(args)
     actionProc.running = true
   }
   function addFriend(value) {
@@ -420,7 +433,7 @@ Panel {
     // This command is fully static. No state, token, or user supplied input
     // is passed through the shell launcher.
     if (bar)
-      bar.run("omarchy-launch-floating-terminal-with-presentation pokachy init")
+      bar.run("PATH=\"$PATH:$HOME/.local/bin\" omarchy-launch-floating-terminal-with-presentation pokachy init")
   }
   function open() {
     refresh()
@@ -448,7 +461,8 @@ Panel {
   Process {
     id: watchProc
     running: true
-    command: ["/usr/bin/env", "pokachy", "watch", "--json"]
+    command: root.pokachyCommand(["watch", "--json"])
+    environment: root.pokachyEnvironment
     stdout: SplitParser {
       onRead: function (line) {
         root.parseState(line)
@@ -475,6 +489,7 @@ Panel {
   Process {
     id: statusProc
     command: []
+    environment: root.pokachyEnvironment
     stdout: SplitParser {
       onRead: function (line) {
         root.parseState(line)
@@ -492,6 +507,7 @@ Panel {
   }
   Process {
     id: historyProc
+    environment: root.pokachyEnvironment
     stdout: StdioCollector {
       onStreamFinished: root.historyOutput = text
     }
@@ -528,6 +544,7 @@ Panel {
   Process {
     id: actionProc
     command: []
+    environment: root.pokachyEnvironment
     // Action commands write human confirmation such as "Done.", not State
     // JSON. The status command and the watcher own state updates.
     stdout: SplitParser {
