@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#000000"/>
+  <rect x="64" y="64" width="1072" height="502" fill="#0b0f0c" stroke="#202822"/>
+  <rect x="64" y="64" width="110" height="3" fill="#55f536"/>
+  <path d="M652 64v502M64 470h588" fill="none" stroke="#202822"/>
+  <g fill="#f5f5ed" font-family="DejaVu Sans, sans-serif">
+    <text x="112" y="133" font-size="26" font-weight="700" letter-spacing="-1.1">pokachy</text>
+    <text x="112" y="224" fill="#55f536" font-family="DejaVu Sans Mono, monospace" font-size="15" letter-spacing="2.4">LINUX NATIVE · FRIENDS ONLY</text>
+    <text x="112" y="346" font-size="94" font-weight="700" letter-spacing="-6">Poke.</text>
+    <text x="112" y="435" fill="#55f536" font-size="94" font-weight="700" letter-spacing="-6">That’s it.</text>
+    <text x="112" y="514" fill="#8d978f" font-size="24">A tiny signal between friends.</text>
+  </g>
+  <image href="pokachy-parrot.svg" x="768" y="91" width="312" height="416" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated"/>
+</svg>
