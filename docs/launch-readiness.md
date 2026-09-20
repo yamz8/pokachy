@@ -4,7 +4,7 @@ Pokachy is not declared ready for a broad public launch by this document. It rec
 
 ## Release to distribute
 
-Use [v0.1.9](https://github.com/yamz8/pokachy/releases/tag/v0.1.9), the patch release containing the Omarchy CLI PATH fallback. The tag identifies the release commit; production deployment is a separate workflow whose exact revision must pass `npm run verify:live`.
+Use [v0.2.0](https://github.com/yamz8/pokachy/releases/tag/v0.2.0), which includes account/profile settings and the earlier Omarchy CLI PATH fallback. The tag identifies the release commit; production deployment is a separate workflow whose exact revision must pass `npm run verify:live`.
 
 | Architecture | Asset |
 | --- | --- |
@@ -16,14 +16,26 @@ Download the archive and `SHA256SUMS` from that release, then verify the downloa
 ```sh
 sha256sum -c SHA256SUMS --ignore-missing
 tar -xzf pokachy_linux_amd64.tar.gz
-cd pokachy_0.1.9_linux_amd64
+cd pokachy_0.2.0_linux_amd64
 bash scripts/install.sh
 pokachy version
 ```
 
 Use the `arm64` filename on ARM Linux. ARM is cross-build and content verified, not executed on ARM hardware. Always use the release's checksum manifest; the dated evidence below describes which live user flows were exercised before this patch release.
 
-## Readiness check — 2026-09-16 (Israel)
+## Readiness check — 2026-09-20 (Israel)
+
+- GitHub reports v0.2.0 published on September 17. Production reported revision `561f3626c986d9f01218b3a6ee985a8931e14ed9` and passed all seven public smoke checks on September 20. The five most recent inspected scheduled smoke runs succeeded.
+- The public bootstrap downloaded, checksum-verified, and installed v0.2.0 on the second physical amd64 laptop into disposable directories. The isolated executable reported `0.2.0`; the existing installation and credentials were preserved.
+- Two owner-authorized, already connected accounts exchanged real production pokes between two physical Omarchy laptops, both running v0.2.0. Both companions were active with zero automatic restarts. Omarchy persisted real notification records in both directions; the local toast and full native panel were visually inspected. Restarting the remote companion retained its pending poke and returned online with zero automatic restarts.
+- Quiet mode on the local account retained a further received test poke without a new Omarchy notification record. The original local quiet setting and workspace were restored. The remote account's quiet setting remained off. This used an existing friendship and existing sessions, not fresh live signup or new friendship acceptance.
+- Fresh `npm run verify` completed with exit 0, all seven stages passing; `artifacts/verification.json` started at `2026-09-20T12:36:51Z`. The first sandboxed attempt failed because loopback listening was prohibited; the completed run had loopback access.
+- Prepared a 1200×630 social preview, homepage Open Graph/X card metadata, and a 22-second H.264 demo recorded from the live desktop test. The demo is an ignored local artifact at `artifacts/launch/pokachy-demo.mp4`. These new homepage tags still need deployment before social crawlers can see them.
+- Browser verification of the new homepage was blocked by a browser-plugin version mismatch (the runtime referenced a missing older module). The social PNG and extracted demo frames were visually inspected, but no fresh browser-rendering or X crawler result is claimed.
+
+Fresh live signup/GitHub consent, authenticated deletion with a disposable account, operator failure-alert delivery, and the operational checks below remain unverified in this pass. Existing owner/test accounts were not deleted, suspended, unlinked, or logged out for testing.
+
+## Historical readiness check — 2026-09-16 (Israel)
 
 - The public bootstrap at `https://pokachy.com/install.sh` downloaded, checksum-verified, and installed the published `0.1.8` amd64 CLI into disposable directories. No desktop service or account was changed. Evidence: `artifacts/public-install-verification.json` (ignored local report).
 - CI, release, and production deployment succeeded for `abc664a`; the read-only smoke check verified that exact deployed revision and all seven public checks. The local Omarchy fix subsequently passed all seven stages of `npm run verify` (report started `2026-09-15T23:54:24Z`, exit 0, 16 Worker tests).
@@ -33,11 +45,11 @@ Use the `arm64` filename on ARM Linux. ARM is cross-build and content verified, 
 - Two explicitly authorized production accounts accepted a friendship and exchanged pokes with the published `0.1.8` CLI. A temporary companion daemon displayed a real Omarchy toast, visually inspected in a private capture. The return poke reached the existing account while its quiet setting stayed enabled. The installed desktop daemon was active/running with zero automatic restarts. This was two accounts on one physical desktop; historical two-desktop checks are recorded in `docs/handoff.md`.
 - A fresh disposable local SQL recovery exercise passed on 2026-09-15 UTC, including restored-session revocation, re-deletion, and zero foreign-key violations. Evidence: `artifacts/recovery-rehearsal.json`. Hosted Worker rollback and D1 Time Travel remain untested here.
 
-The fresh two-account smoke test passed on one physical Omarchy desktop. Use v0.1.9 for users who need its PATH fallback. A fresh install on a second physical desktop remains a useful pilot check. Keep test inboxes and credentials out of this public record.
+That historical smoke test used one physical desktop. The September 20 check above supersedes its second-computer and installer gaps; fresh onboarding remains separate. Keep test inboxes and credentials out of this public record.
 
 ## Invite-only pilot
 
-Keep the initial cohort small and individually invited. There are no pilot participants yet; recruiting an explicitly invited initial cohort remains a launch gate. Before each invitation, confirm the person has a supported Linux desktop, `~/.local/bin` on `PATH`, `notify-send`, and a compatible notification service. Give them the exact release link and checksum procedure above, not an unpinned repository snapshot.
+Keep the initial cohort small and individually invited. A supported pilot beyond the owner-controlled test accounts has not been documented here. Before each invitation, confirm the person has a supported Linux desktop, `~/.local/bin` on `PATH`, `notify-send`, and a compatible notification service. Give them the exact release link and checksum procedure above, not an unpinned repository snapshot.
 
 For each pilot participant, record consent, installation architecture, release tag, checksum result, onboarding outcome, service status, and the support route agreed for the pilot. Private support is available at `support@pokachy.com`: Cloudflare routing is enabled, the forwarding destination is verified, and the owner confirmed successful inbox delivery after sending a test email. Ask participants to test email sign-in or GitHub sign-in, device-code matching, adding and accepting one friend, one received poke, quiet mode, blocking, logout, and service restart. Do not ask participants to share device codes, session tokens, email codes, screenshots containing them, or account data beyond what is needed for their support request.
 
