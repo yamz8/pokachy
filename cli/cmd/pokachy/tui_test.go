@@ -133,6 +133,8 @@ func TestTUIKeepsSelectionAcrossRefresh(t *testing.T) {
 func TestTUIRenderFitsTerminalAndStripsRemoteControls(t *testing.T) {
 	s := tuiFixtureState()
 	s.Friends[0].Name = "Ana\x1b]0;evil\x07 " + strings.Repeat("long", 40)
+	s.Friends[1].Name = strings.Repeat("王小明", 10)
+	s.Requests[0].Name = "Zoë 🎉 José"
 	m := &tuiModel{width: 40, height: 10}
 	m.setState(s)
 	frame := m.render(time.Now())
@@ -148,7 +150,7 @@ func TestTUIRenderFitsTerminalAndStripsRemoteControls(t *testing.T) {
 		for _, code := range []string{ansiReset, ansiBold, ansiDim, ansiReverse, ansiRed, ansiGreen, ansiYellow} {
 			plain = strings.ReplaceAll(plain, code, "")
 		}
-		if n := len([]rune(plain)); n != 40 {
+		if n := textWidth(plain); n != 40 {
 			t.Fatalf("line width %d: %q", n, plain)
 		}
 	}
@@ -162,5 +164,87 @@ func TestParseKeys(t *testing.T) {
 	want := []string{"j", "up", "down", "enter", "backspace", "ctrl+c", "é", "esc", "q"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("parseKeys = %q want %q", got, want)
+	}
+}
+
+func TestFitCountsTerminalColumns(t *testing.T) {
+	for _, tc := range []struct {
+		in    string
+		width int
+		want  string
+	}{
+		{"abc", 5, "abc  "},
+		{"王小明", 6, "王小明"},
+		{"王小明", 7, "王小明 "},
+		{"王小明", 5, "王小…"},
+		{"王小明", 4, "王… "},                // 小 would straddle the edge, so it becomes padding
+		{"Jose\u0301", 5, "Jose\u0301 "}, // combining accent takes no column
+		{"🎉 hi", 3, "🎉…"},
+		{"김민준", 1, "…"},
+		{"anything", 0, ""},
+	} {
+		got := fit(tc.in, tc.width)
+		if got != tc.want || textWidth(got) != tc.width {
+			t.Errorf("fit(%q, %d) = %q (width %d), want %q", tc.in, tc.width, got, textWidth(got), tc.want)
+		}
+	}
+	for r, want := range map[rune]int{'a': 1, 'é': 1, '\u0301': 0, '王': 2, '김': 2, 'Ａ': 2, '🎉': 2, '·': 1, '…': 1, '▸': 1, '\u3248': 1} {
+		if got := cellWidth(r); got != want {
+			t.Errorf("cellWidth(%U) = %d, want %d", r, got, want)
+		}
+	}
+}
+
+func TestTUIHistoryScrollsAndKeepsHint(t *testing.T) {
+	m := &tuiModel{width: 40, height: 8, mode: tuiHistory, historyFor: "ana"}
+	next := "older"
+	for i := range 20 {
+		m.history.History = append(m.history.History, Poke{CreatedAt: int64(i+1) * 60_000})
+	}
+	m.history.NextCursor = &next
+	frame := m.render(time.Now())
+	if !strings.Contains(frame, "n for older") {
+		t.Fatalf("paging hint scrolled off:\n%s", frame)
+	}
+	for range 30 {
+		m.key("j")
+	}
+	m.render(time.Now())
+	if m.historyTop != 20-2 { // body is 4 rows: title, 2 entries, hint
+		t.Fatalf("historyTop = %d after scrolling to the end", m.historyTop)
+	}
+	m.key("k")
+	if m.historyTop != 17 {
+		t.Fatalf("historyTop = %d after scrolling up", m.historyTop)
+	}
+}
+
+func TestTUIAddFriendTakesOnlyHandleCharacters(t *testing.T) {
+	b := &fakeTUIBackend{state: tuiFixtureState()}
+	m := &tuiModel{width: 80, height: 24}
+	m.setState(b.state)
+	press(t, m, b, "a", "@", "王", "B", "o", "-", "_", "1", "@", "enter")
+	if got := b.calls[0]; got != "POST /api/friends/bo_1" {
+		t.Fatalf("add friend called %q", got)
+	}
+}
+
+func TestTUIAddFriendAcceptsAnIncomingRequest(t *testing.T) {
+	b := &fakeTUIBackend{state: tuiFixtureState()}
+	m := &tuiModel{width: 80, height: 24}
+	m.setState(b.state)
+	press(t, m, b, "a", "c", "y", "enter")
+	if got := b.calls[0]; got != "POST /api/friends/cy/accept" {
+		t.Fatalf("adding a pending requester called %q", got)
+	}
+}
+
+func TestTUIHelpFitsNarrowTerminals(t *testing.T) {
+	for _, w := range []int{40, 80} {
+		m := &tuiModel{width: w, height: 30, mode: tuiHelp}
+		frame := m.render(time.Now())
+		if strings.Contains(frame, "…") || !strings.Contains(frame, "remove · decline · cancel") {
+			t.Fatalf("help cut off at width %d:\n%s", w, frame)
+		}
 	}
 }
