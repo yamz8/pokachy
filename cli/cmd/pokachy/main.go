@@ -419,6 +419,7 @@ func help() {
 	fmt.Print(`Pokachy — a little nudge for your Linux friends
 
   pokachy init [--server https://pokachy.com] [--no-browser] [--no-desktop]
+  pokachy tui                    Interactive terminal view: poke, inbox, friends
   pokachy poke @friend
   pokachy friends [add|accept|remove] @friend
   pokachy inbox
@@ -492,6 +493,9 @@ func run(args []string) error {
 	defer cancel()
 	if args[0] == "daemon" {
 		return c.daemon(ctx)
+	}
+	if args[0] == "tui" {
+		return tui(c)
 	}
 	need := func(n int) error {
 		if len(args) < n {
