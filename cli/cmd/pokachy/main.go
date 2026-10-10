@@ -30,7 +30,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.2.0"
+const version = "0.3.0"
 
 const omarchyPluginURL = "https://github.com/yamz8/pokachy-omarchy.git"
 const bootstrapInstallerURL = "https://github.com/yamz8/pokachy/releases/latest/download/install.sh"
