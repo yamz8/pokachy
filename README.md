@@ -61,7 +61,7 @@ pokachy profile image /path/to/avatar.png
 
 Account commands create a five-minute, single-use browser handoff tied to the CLI's signed-in account. If the browser is signed in as someone else, Pokachy refuses the handoff without changing either account.
 
-Only mutual friends can poke. There is one outstanding poke per direction and a ten-second cooldown. Replying clears the poke you received. Quiet mode preserves the inbox while suppressing notifications. `pokachy help` lists commands; `--json` supports automation. `pokachy tui` opens a live terminal view of your inbox, friends, and requests: press Enter to poke, `a` to add a friend, `d` to dismiss, `h` for history, `z` for quiet mode, and `?` for all keys.
+Only mutual friends can poke. There is one outstanding poke per direction and a ten-second cooldown. Replying clears the poke you received. Quiet mode preserves the inbox while suppressing notifications. `pokachy help` lists commands; `--json` supports automation. `pokachy tui` opens a live terminal view of your inbox, friends, and requests: press Enter to poke, `a` to add a friend, `d` to dismiss, `h` for history, `z` for quiet mode, `u` to unblock someone in the Blocked section, and `?` for all keys.
 
 ## Omarchy
 

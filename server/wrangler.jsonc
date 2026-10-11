@@ -11,13 +11,13 @@
   "vars": {
     "ENVIRONMENT": "local", "BASE_URL": "http://127.0.0.1:8787",
     "TURNSTILE_SITE_KEY": "", "TURNSTILE_HOSTNAMES": "127.0.0.1,localhost",
-    "MAIL_FROM": "Pokachy <hello@pokachy.com>", "MAIL_DEAD_LETTER_QUEUE": "pokachy-mail-failed", "ADMIN_USER_IDS": ""
+    "MAIL_FROM": "Pokachy <hello@pokachy.com>", "MAIL_DEAD_LETTER_QUEUE": "pokachy-mail-failed"
   },
   "d1_databases": [{"binding": "DB", "database_name": "pokachy-local", "database_id": "00000000-0000-0000-0000-000000000001", "migrations_dir": "migrations"}],
   "r2_buckets": [{"binding": "AVATARS", "bucket_name": "pokachy-avatars-local"}],
   "durable_objects": {"bindings": [{"name": "HUBS", "class_name": "UserHub"}]},
   "migrations": [{"tag": "v1", "new_sqlite_classes": ["UserHub"]}],
-  "observability": {"enabled": true, "logs": {"enabled": true, "head_sampling_rate": 1}, "traces": {"enabled": true, "head_sampling_rate": 0.01}},
+  "observability": {"enabled": true, "logs": {"enabled": true, "head_sampling_rate": 1}, "traces": {"enabled": true, "head_sampling_rate": 0.01}, "issues": {"enabled": true}},
   "limits": {"cpu_ms": 100},
   "env": {
     "production": {

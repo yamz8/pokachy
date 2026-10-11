@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createAuth } from "./auth";
-import type { AppEnv } from "./env";
+import { adminIds, type AppEnv } from "./env";
 
 export const accountRoutes = new Hono<{ Bindings: AppEnv }>();
 
@@ -41,7 +41,7 @@ accountRoutes.post("/delete", async c => {
   const { confirmation, otp } = await c.req.json<{ confirmation?: unknown; otp?: unknown }>();
   if (confirmation !== "DELETE MY ACCOUNT") return c.json({ error: "Type DELETE MY ACCOUNT to confirm." }, 400);
   const id = identity.user.id;
-  if (c.env.ADMIN_USER_IDS.split(",").map(value => value.trim()).includes(id)) {
+  if (adminIds(c.env).includes(id)) {
     return c.json({ error: "Transfer administrator responsibility and remove this account from administrator configuration before deleting it." }, 409);
   }
   // A recently approved device also has a fresh session. Require independent email
