@@ -4,7 +4,7 @@ import { version } from "../package.json";
 import { createAuth } from "./auth";
 import { accountRoutes } from "./account-deletion";
 import { cleanExpiredAuth } from "./retention";
-import { isLocal, type AppEnv, type MailJob } from "./env";
+import { adminIds, isLocal, type AppEnv, type MailJob } from "./env";
 export { UserHub } from "./hub";
 
 type Identity = NonNullable<Awaited<ReturnType<ReturnType<typeof createAuth>["api"]["getSession"]>>>;
@@ -447,7 +447,7 @@ app.post("/api/reports/:handle",async c=>{
   return c.json({ok:true});
 });
 app.use("/api/admin/*",async(c,next)=>{
-  if(!c.env.ADMIN_USER_IDS.split(",").filter(Boolean).includes(uid(c))) return error(c,"Administrator access required",403);
+  if(!adminIds(c.env).includes(uid(c))) return error(c,"Administrator access required",403);
   await next();
 });
 app.get("/api/admin/reports",async c=>{

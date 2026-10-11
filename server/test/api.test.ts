@@ -108,7 +108,10 @@ test("email onboarding, consent, idempotency, concurrency, reply, block and isol
 test("administrators can review reports and suspend another user",async()=>{
   const admin=await user("adminuser"),reported=await user("reporteduser"),reporter=await user("reporteruser");
   expect((await request("/api/reports/reporteduser",reporter.token,"POST",{reason:"Authorized abuse report test"})).status).toBe(200);
-  const adminEnv={...env,ADMIN_USER_IDS:admin.user.id} as typeof env;
+  // Spaces around configured IDs are ignored, matching the account-deletion guard.
+  const adminEnv={...env,ADMIN_USER_IDS:` other-admin , ${admin.user.id} `} as typeof env;
+  expect(env.ADMIN_USER_IDS).toBeUndefined();
+  expect((await request("/api/admin/reports",admin.token)).status).toBe(403);
   const adminRequest=(path:string,method="GET")=>worker.fetch(new Request(origin+path,{
     method,headers:{"Content-Type":"application/json","X-Pokachy-Client":"cli","CF-Connecting-IP":`192.0.2.${testIP}`,Authorization:`Bearer ${admin.token}`},
     body:method==="GET"?undefined:"{}",

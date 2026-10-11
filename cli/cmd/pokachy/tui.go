@@ -36,6 +36,7 @@ const (
 	tuiInbox tuiItemKind = iota
 	tuiFriend
 	tuiRequest
+	tuiBlocked
 )
 
 type tuiItem struct {
@@ -105,6 +106,9 @@ func (m *tuiModel) setState(s State) {
 	}
 	for _, p := range s.Requests {
 		m.items = append(m.items, tuiItem{kind: tuiRequest, handle: p.Handle, name: p.Name, outgoing: p.Outgoing})
+	}
+	for _, p := range s.Blocked {
+		m.items = append(m.items, tuiItem{kind: tuiBlocked, handle: p.Handle, name: p.Name})
 	}
 	// Keep the cursor on the same row across refreshes when it still exists.
 	if selected != nil {
@@ -258,6 +262,10 @@ func (m *tuiModel) key(k string) tuiOp {
 		if it == nil {
 			return nil
 		}
+		if it.kind == tuiBlocked {
+			m.say("Press u to unblock @"+safe(it.handle)+".", false)
+			return nil
+		}
 		if it.kind == tuiRequest {
 			if it.outgoing == 1 {
 				m.say("Waiting for @"+safe(it.handle)+" to accept.", false)
@@ -278,12 +286,12 @@ func (m *tuiModel) key(k string) tuiOp {
 		}
 		return m.start("Dismissing…", tuiMutation("POST", "/api/inbox/"+url.PathEscape(it.id)+"/dismiss", map[string]any{}, "Dismissed."))
 	case "h":
-		if it == nil || it.kind == tuiRequest {
+		if it == nil || it.kind == tuiRequest || it.kind == tuiBlocked {
 			return nil
 		}
 		return m.historyOp(it.handle, "")
 	case "x":
-		if it == nil || it.kind == tuiInbox {
+		if it == nil || it.kind == tuiInbox || it.kind == tuiBlocked {
 			return nil
 		}
 		prompt := "Remove @" + safe(it.handle) + " from friends?"
@@ -295,10 +303,15 @@ func (m *tuiModel) key(k string) tuiOp {
 		}
 		m.ask(prompt, tuiMutation("DELETE", handlePath("/api/friends/", it.handle, ""), map[string]any{}, done))
 	case "b":
-		if it == nil {
+		if it == nil || it.kind == tuiBlocked {
 			return nil
 		}
 		m.ask("Block @"+safe(it.handle)+"? They will not be able to poke you.", tuiMutation("POST", handlePath("/api/blocks/", it.handle, ""), map[string]any{}, "Blocked @"+safe(it.handle)+"."))
+	case "u":
+		if it == nil || it.kind != tuiBlocked {
+			return nil
+		}
+		m.ask("Unblock @"+safe(it.handle)+"? They can send you a friend request again.", tuiMutation("DELETE", handlePath("/api/blocks/", it.handle, ""), map[string]any{}, "Unblocked @"+safe(it.handle)+"."))
 	}
 	return nil
 }
@@ -447,6 +460,8 @@ func tuiLabel(it tuiItem, now time.Time) string {
 			return who + " · request sent"
 		}
 		return who + " · wants to be friends"
+	case tuiBlocked:
+		return who + " · blocked"
 	}
 	if it.waiting == 1 {
 		return who + " · waiting for a poke back"
@@ -501,7 +516,8 @@ func (m *tuiModel) render(now time.Time) string {
 			{"a", "add a friend"}, {"d", "dismiss a poke"},
 			{"h", "history"}, {"x", "remove · decline · cancel"},
 			{"z", "toggle quiet"}, {"b", "block"},
-			{"r", "refresh"}, {"q", "quit"},
+			{"u", "unblock"}, {"r", "refresh"},
+			{"?", "this help"}, {"q", "quit"},
 		}
 		// Two columns when they fit, otherwise one, so nothing is cut off.
 		for i := 0; i < len(help); i += 2 {
@@ -626,6 +642,9 @@ func (m *tuiModel) listRows(now time.Time) []tuiRow {
 	section(tuiFriend, fmt.Sprintf("Friends (%d)", len(m.state.Friends)), "Your corner is quiet. Press a to add someone.")
 	if len(m.state.Requests) > 0 {
 		section(tuiRequest, fmt.Sprintf("Requests (%d)", len(m.state.Requests)), "")
+	}
+	if len(m.state.Blocked) > 0 {
+		section(tuiBlocked, fmt.Sprintf("Blocked (%d)", len(m.state.Blocked)), "")
 	}
 	return rows
 }

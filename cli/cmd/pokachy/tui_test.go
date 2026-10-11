@@ -248,3 +248,33 @@ func TestTUIHelpFitsNarrowTerminals(t *testing.T) {
 		}
 	}
 }
+
+func TestTUIBlockedPeopleCanOnlyBeUnblocked(t *testing.T) {
+	s := State{Me: Me{Handle: "me"}, Friends: []Person{{Handle: "ana"}}, Blocked: []Person{{Handle: "zed", Name: "Zed"}}}
+	b := &fakeTUIBackend{state: s}
+	m := &tuiModel{width: 80, height: 24}
+	m.setState(s)
+	frame := m.render(time.Now())
+	if !strings.Contains(frame, "Blocked (1)") || !strings.Contains(frame, "Zed (@zed) · blocked") {
+		t.Fatalf("blocked section missing:\n%s", frame)
+	}
+
+	press(t, m, b, "j")                    // move to zed
+	press(t, m, b, "enter", "h", "x", "b") // no poke, history, removal, or second block
+	if len(b.calls) != 0 || m.message != "Press u to unblock @zed." {
+		t.Fatalf("blocked person allowed an action: calls=%v message=%q", b.calls, m.message)
+	}
+	press(t, m, b, "u", "n")
+	if len(b.calls) != 0 || m.message != "Cancelled." {
+		t.Fatalf("cancelled unblock still ran: calls=%v message=%q", b.calls, m.message)
+	}
+	press(t, m, b, "u", "y")
+	if want := []string{"DELETE /api/blocks/zed", "sync"}; !reflect.DeepEqual(b.calls, want) || m.message != "Unblocked @zed." {
+		t.Fatalf("unblock calls=%v message=%q", b.calls, m.message)
+	}
+
+	press(t, m, b, "k", "u") // u does nothing on a friend
+	if len(b.calls) != 2 {
+		t.Fatalf("u acted on a friend: %v", b.calls)
+	}
+}
