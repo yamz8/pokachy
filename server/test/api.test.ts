@@ -353,6 +353,34 @@ test("mail consumer retries failures and discards expired codes",async()=>{
   expect(send).toHaveBeenCalledOnce();expect(fresh.retry).toHaveBeenCalledOnce();expect(expired.ack).toHaveBeenCalledOnce();
 });
 
+test("dead-lettered mail is logged without the address or code, then dropped",async()=>{
+  const send=vi.fn();
+  const failed={body:{email:"dead@example.test",otp:"424242",type:"sign-in",expiresAt:Date.now()+60_000},attempts:4,ack:vi.fn(),retry:vi.fn()};
+  const lines:string[]=[];
+  const logged=vi.spyOn(console,"error").mockImplementation(line=>{lines.push(String(line));});
+  try { await worker.queue({queue:"pokachy-mail-failed",messages:[failed]} as never,{...env,EMAIL:{send}} as never); }
+  finally { logged.mockRestore(); }
+  expect(send).not.toHaveBeenCalled();expect(failed.ack).toHaveBeenCalledOnce();expect(failed.retry).not.toHaveBeenCalled();
+  expect(lines.map(line=>JSON.parse(line))).toEqual([{event:"email_delivery_failed",type:"sign-in",attempts:4}]);
+  expect(lines.join("")).not.toMatch(/dead@example|424242/);
+});
+
+test("unexpected failures log a short message without email addresses",async()=>{
+  const a=await user("failurelog");
+  const batch=vi.spyOn(env.DB,"batch").mockRejectedValueOnce(new Error("D1_ERROR: lookup failed for failurelog@example.test "+"x".repeat(400)));
+  const lines:string[]=[];
+  const logged=vi.spyOn(console,"error").mockImplementation(line=>{lines.push(String(line));});
+  try {
+    const response=await request("/api/state",a.token);
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({error:"Something went wrong. Please try again."});
+  } finally { batch.mockRestore(); logged.mockRestore(); }
+  const entry=JSON.parse(lines.at(-1)!) as {event:string;path:string;error:string;message:string};
+  expect({event:entry.event,path:entry.path,error:entry.error}).toEqual({event:"request_failed",path:"/api/state",error:"Error"});
+  expect(entry.message.startsWith("D1_ERROR: lookup failed for [email] x")).toBe(true);
+  expect(entry.message).toHaveLength(200);
+});
+
 test("public config fails closed without production secrets",async()=>{
   const production={...env,ENVIRONMENT:"production",BASE_URL:"https://pokachy.com"};
   const res=await worker.fetch(new Request("https://pokachy.com/api/dev/mail?email=a@example.test"),production,ctx);

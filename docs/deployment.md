@@ -103,7 +103,7 @@ Local packaging: `scripts/package-release.sh v0.1.0`. Archives contain the CLI, 
 
 Verify `/health`, email delivery, GitHub callback, device approval, and a poke between two accepted friends. Revocation must reject the old device session; blocking must prevent further requests/pokes. The development code endpoint must remain unavailable in production.
 
-Inspect Workers logs and Queue metrics. Delivery retries stop when the code expires; exhausted retries go to the dead-letter queue. Never log codes, tokens, secrets, or email bodies. D1 recovery is independent of code rollback, so inspect migrations before reverting a release.
+Inspect Workers logs and Queue metrics. Delivery retries stop when the code expires; exhausted retries go to the dead-letter queue, which the Worker consumes: it logs an error-level `email_delivery_failed` event (code type and attempts only, never the address or code) and drops the message. Unexpected request failures log `request_failed` with the path, error type, and a short message with email addresses removed. Never log codes, tokens, secrets, or email bodies. D1 recovery is independent of code rollback, so inspect migrations before reverting a release.
 
 Stop desktop notifications with `systemctl --user disable --now pokachy.service`; revoke this computer with `pokachy logout`. Account settings can revoke other signed-in devices.
 

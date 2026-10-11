@@ -11,7 +11,7 @@
   "vars": {
     "ENVIRONMENT": "local", "BASE_URL": "http://127.0.0.1:8787",
     "TURNSTILE_SITE_KEY": "", "TURNSTILE_HOSTNAMES": "127.0.0.1,localhost",
-    "MAIL_FROM": "Pokachy <hello@pokachy.com>", "ADMIN_USER_IDS": ""
+    "MAIL_FROM": "Pokachy <hello@pokachy.com>", "MAIL_DEAD_LETTER_QUEUE": "pokachy-mail-failed", "ADMIN_USER_IDS": ""
   },
   "d1_databases": [{"binding": "DB", "database_name": "pokachy-local", "database_id": "00000000-0000-0000-0000-000000000001", "migrations_dir": "migrations"}],
   "r2_buckets": [{"binding": "AVATARS", "bucket_name": "pokachy-avatars-local"}],
@@ -24,7 +24,7 @@
       "name": "pokachy",
       "triggers": {"crons": ["17 * * * *"]},
       "secrets": {"required": ["ADMIN_USER_IDS", "BETTER_AUTH_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "TURNSTILE_SECRET"]},
-      "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>"},
+      "vars": {"ENVIRONMENT": "production", "BASE_URL": "https://pokachy.com", "TURNSTILE_SITE_KEY": "0x4AAAAAAEsSTwNmzM0yiO2V", "TURNSTILE_HOSTNAMES": "pokachy.com", "MAIL_FROM": "Pokachy <hello@pokachy.com>", "MAIL_DEAD_LETTER_QUEUE": "pokachy-mail-failed"},
       "routes": [{"pattern": "pokachy.com", "custom_domain": true}],
       "d1_databases": [{"binding": "DB", "database_name": "pokachy", "database_id": "0cd8e576-f169-42bb-b944-42b60ef5e44e", "migrations_dir": "migrations"}],
       "r2_buckets": [{"binding": "AVATARS", "bucket_name": "pokachy-avatars"}],
@@ -32,7 +32,11 @@
       "send_email": [{"name": "EMAIL"}],
       "queues": {
         "producers": [{"binding": "MAIL_QUEUE", "queue": "pokachy-mail"}],
-        "consumers": [{"queue": "pokachy-mail", "max_batch_size": 10, "max_retries": 3, "dead_letter_queue": "pokachy-mail-failed"}]
+        "consumers": [
+          {"queue": "pokachy-mail", "max_batch_size": 10, "max_retries": 3, "dead_letter_queue": "pokachy-mail-failed"},
+          // Logs exhausted deliveries without the address or code, then drops them.
+          {"queue": "pokachy-mail-failed", "max_batch_size": 10, "max_retries": 1}
+        ]
       }
     }
   }

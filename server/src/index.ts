@@ -17,6 +17,8 @@ const error = (c: Ctx, message: string, status: 400 | 401 | 403 | 404 | 409 | 42
 const uid = (c: Ctx) => c.get("identity").user.id;
 const pair = (a: string, b: string) => [a, b].sort();
 const sql = (c: Ctx, query: string, ...args: unknown[]) => c.env.DB.prepare(query).bind(...args);
+// Error text is logged for diagnosis; keep it short and drop anything shaped like an address.
+const logSafe = (text: unknown) => String(text ?? "").replace(/[^\s@"'<>]+@[^\s@"'<>]+/g, "[email]").slice(0, 200);
 const hex = (bytes: Uint8Array) => Array.from(bytes, value => value.toString(16).padStart(2, "0")).join("");
 async function handoffHash(token: string) {
   return hex(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))));
@@ -508,7 +510,7 @@ app.get("*",c=>{
 });
 app.onError((err,c)=>{
   if(err instanceof SyntaxError) return error(c,"Invalid JSON");
-  console.error(JSON.stringify({event:"request_failed",path:c.req.path,error:err.name}));
+  console.error(JSON.stringify({event:"request_failed",path:c.req.path,error:err.name,message:logSafe(err.message)}));
   return c.json({error:"Something went wrong. Please try again."},500);
 });
 export default {
@@ -517,6 +519,15 @@ export default {
     await cleanExpiredAuth(env);
   },
   async queue(batch: MessageBatch<MailJob>,env: AppEnv):Promise<void>{
+    if(batch.queue===env.MAIL_DEAD_LETTER_QUEUE){
+      // Delivery retries are exhausted, so the code can no longer help anyone. Record the
+      // failure without the address or code, then drop the message so neither lingers.
+      for(const message of batch.messages){
+        console.error(JSON.stringify({event:"email_delivery_failed",type:message.body.type??"sign-in",attempts:message.attempts}));
+        message.ack();
+      }
+      return;
+    }
     for(const message of batch.messages){
       const job=message.body;
       if(job.expiresAt<Date.now()){message.ack();continue;}
