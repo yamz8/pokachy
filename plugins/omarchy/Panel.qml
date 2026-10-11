@@ -230,9 +230,15 @@ Panel {
   function handle(person) {
     return String(person && person.handle || "").replace(/^@/, "")
   }
+  // The CLI downloads avatars and reports a local copy. Loading remote images in
+  // the shell made Qt start TLS in its image thread at startup, which crashed
+  // quickshell, so only files named the way the CLI writes them are shown.
   function safeAvatarImage(value) {
-    var image = String(value || "")
-    return /^https:\/\/avatars\.githubusercontent\.com\//.test(image) || /^https:\/\/pokachy\.com\/avatars\//.test(image) || /^http:\/\/(127\.0\.0\.1|localhost)(:[0-9]+)?\/avatars\//.test(image) ? image : ""
+    var path = String(value || "")
+    var parts = path.split("/")
+    if (!/^\/.*\/avatars\/[0-9a-f]{64}\.(png|jpg|webp|avif)$/.test(path) || parts.indexOf("..") >= 0 || parts.indexOf(".") >= 0)
+      return ""
+    return "file://" + parts.map(encodeURIComponent).join("/")
   }
   function friendForHandle(value) {
     var wanted = String(value || "").replace(/^@/, "")
@@ -748,7 +754,7 @@ Panel {
             iconComponent: Component {
               AvatarButton {
                 label: root.needsLogin ? "" : root.avatarInitial(root.pokachyState.me)
-                image: root.needsLogin ? "" : String(root.pokachyState.me && root.pokachyState.me.image || "")
+                image: root.needsLogin ? "" : String(root.pokachyState.me && root.pokachyState.me.imageFile || "")
                 tooltipText: root.needsLogin ? "Pokachy" : "Your profile"
                 foreground: root.foreground
                 interactive: false
@@ -775,7 +781,7 @@ Panel {
               anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               label: root.avatarInitial(root.pokachyState.me)
-              image: String(root.pokachyState.me && root.pokachyState.me.image || "")
+              image: String(root.pokachyState.me && root.pokachyState.me.imageFile || "")
               tooltipText: "Open your profile settings"
               interactive: true
               size: Style.space(36)
@@ -1010,7 +1016,7 @@ Panel {
               AvatarButton {
                 id: settingsAvatar
                 label: root.avatarInitial(root.pokachyState.me)
-                image: String(root.pokachyState.me && root.pokachyState.me.image || "")
+                image: String(root.pokachyState.me && root.pokachyState.me.imageFile || "")
                 tooltipText: "Choose profile picture"
                 foreground: root.foreground
                 interactive: true
@@ -1417,7 +1423,7 @@ Panel {
                 anchors.leftMargin: Style.space(8)
                 anchors.verticalCenter: parent.verticalCenter
                 label: root.avatarInitial(root.activeFriend)
-                image: String(root.activeFriend && root.activeFriend.image || "")
+                image: String(root.activeFriend && root.activeFriend.imageFile || "")
                 tooltipText: root.displayName(root.activeFriend)
                 foreground: root.foreground
                 interactive: false
@@ -1711,7 +1717,7 @@ Panel {
           anchors.leftMargin: Style.space(4)
           anchors.verticalCenter: parent.verticalCenter
           label: root.avatarInitial(friendItem.modelData)
-          image: String(friendItem.modelData.image || "")
+          image: String(friendItem.modelData.imageFile || "")
           tooltipText: "Open poke history with @" + friendItem.friendHandle
           foreground: root.foreground
           interactive: true

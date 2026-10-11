@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -706,8 +707,23 @@ func TestUninstallRemovesOnlyKnownLocalFilesAndKeepsAccount(t *testing.T) {
 	env.configDir = func() string { return filepath.Join(tmp, "pokachy") }
 	env.userConfigDir = func() string { return filepath.Join(tmp, "config") }
 	env.installPrefix = func() string { return filepath.Join(tmp, "custom-prefix") }
+	avatars := filepath.Join(tmp, "pokachy", "avatars")
+	cachedAvatar := filepath.Join(avatars, avatarKey("https://avatars.githubusercontent.com/u/1")+".png")
+	if err := os.MkdirAll(avatars, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{cachedAvatar, filepath.Join(avatars, "notes.txt")} {
+		if err := os.WriteFile(path, []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := uninstallWithEnvironment(context.Background(), true, env); err != nil {
 		t.Fatalf("uninstall: %v", err)
+	}
+	// Cached avatars go before their directory, which goes before the config directory.
+	avatarAt, dirAt, configAt := slices.Index(removed, cachedAvatar), slices.Index(removed, avatars), slices.Index(removed, filepath.Join(tmp, "pokachy"))
+	if avatarAt < 0 || dirAt <= avatarAt || configAt <= dirAt || slices.Contains(removed, filepath.Join(avatars, "notes.txt")) {
+		t.Fatalf("avatar cleanup order or scope is wrong: %q", removed)
 	}
 	wantCommands := [][]string{
 		{"omarchy", "plugin", "remove", omarchyPluginID, "--yes"},

@@ -1,6 +1,6 @@
 # Omarchy panel
 
-The Pokachy monorepo keeps the panel source in `plugins/omarchy/`. Tested releases publish those files to a minimal standalone plugin repository. The panel reads the CLI's local cache through `pokachy watch --json`; it never reads credentials or tokens.
+The Pokachy monorepo keeps the panel source in `plugins/omarchy/`. Tested releases publish those files to a minimal standalone plugin repository. The panel reads the CLI's local cache through `pokachy watch --json`; it never reads credentials or tokens and makes no network requests. The CLI downloads profile pictures, only from GitHub avatars and the configured server's `/avatars/` path, without credentials or redirects, verifies they are PNG, JPEG, WebP, or AVIF files up to 2 MB, and stores them in `avatars/` inside its configuration directory. The panel shows only those files. Loading remote images inside the shell previously made Qt start TLS in its image thread at startup, which could crash quickshell.
 
 Install and connect the `pokachy` CLI first. `pokachy init` offers this native Omarchy installation automatically, or you can install or repair the panel later with:
 

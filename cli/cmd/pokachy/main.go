@@ -47,6 +47,8 @@ type Person struct {
 	Image    string `json:"image"`
 	Outgoing int    `json:"outgoing"`
 	Waiting  int    `json:"waiting"`
+	// ImageFile is the locally cached copy of Image that the Omarchy panel shows.
+	ImageFile string `json:"imageFile,omitempty"`
 }
 type Poke struct {
 	ID        string `json:"id"`
@@ -55,6 +57,7 @@ type Poke struct {
 	Image     string `json:"image"`
 	CreatedAt int64  `json:"created_at"`
 	Outgoing  int    `json:"outgoing"`
+	ImageFile string `json:"imageFile,omitempty"`
 }
 type Me struct {
 	ID              string `json:"id"`
@@ -62,6 +65,7 @@ type Me struct {
 	Name            string `json:"name"`
 	Email           string `json:"email"`
 	Image           string `json:"image"`
+	ImageFile       string `json:"imageFile,omitempty"`
 	CustomImage     bool   `json:"customImage"`
 	Quiet           bool   `json:"quiet"`
 	GitHubAvailable bool   `json:"githubAvailable"`
@@ -87,6 +91,8 @@ type Client struct {
 	Config Config
 	HTTP   *http.Client
 	Dir    string
+	// AvatarHTTP downloads avatars without credentials; nil uses avatarClient.
+	AvatarHTTP *http.Client
 }
 type APIError struct {
 	Status  int
@@ -353,6 +359,7 @@ func (c *Client) sync(ctx context.Context) (State, error) {
 	}
 	s.Online = true
 	s.SyncedAt = time.Now().Unix()
+	c.cacheAvatars(ctx, &s)
 	err = save(filepath.Join(c.Dir, "state.json"), s)
 	return s, err
 }
@@ -422,12 +429,18 @@ func notificationIcon() string {
 }
 
 func clearLocalSession(dir string) error {
+	paths := avatarFiles(dir)
 	for _, name := range []string{"credentials.json", "state.json", "notified.json"} {
-		err := os.Remove(filepath.Join(dir, name))
+		paths = append(paths, filepath.Join(dir, name))
+	}
+	for _, path := range paths {
+		err := os.Remove(path)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
+	// Non-recursive: anything Pokachy did not write keeps the directory.
+	_ = os.Remove(avatarDir(dir))
 	return nil
 }
 func outputJSON(v any) { b, _ := json.Marshal(v); fmt.Println(string(b)) }
@@ -1371,6 +1384,8 @@ func knownPokachyPaths(env maintenanceEnvironment) []string {
 		for _, name := range []string{"credentials.json", "state.json", "notified.json", "daemon.lock"} {
 			appendPath(cleanConfig, name)
 		}
+		paths = append(paths, avatarFiles(cleanConfig)...)
+		appendPath(cleanConfig, "avatars")
 		// os.Remove is deliberately non-recursive: unexpected files survive.
 		appendPath(cleanConfig)
 	}
