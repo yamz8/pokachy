@@ -356,9 +356,15 @@ app.post("/api/friends/:handle", async c => {
   const result = await sql(c,`INSERT INTO friendships SELECT ?,?,?,0,?
     WHERE NOT EXISTS(SELECT 1 FROM blocks WHERE (blocker=? AND blocked=?) OR (blocker=? AND blocked=?))
     ON CONFLICT(a,b) DO NOTHING`,a,b,uid(c),Date.now(),a,b,b,a).run();
-  if (!result.meta.changes) return error(c,"You already have a friendship or pending request",409);
+  if (!result.meta.changes) {
+    // Asking someone who already asked you is mutual consent: accept their request.
+    const accepted = await sql(c,"UPDATE friendships SET accepted=1 WHERE a=? AND b=? AND requester=? AND accepted=0",a,b,other.id).run();
+    if (!accepted.meta.changes) return error(c,"You already have a friendship or pending request",409);
+    await notify(c,other.id,uid(c));
+    return c.json({ok:true,accepted:true});
+  }
   await notify(c,other.id,uid(c));
-  return c.json({ok:true});
+  return c.json({ok:true,accepted:false});
 });
 app.post("/api/friends/:handle/accept", async c => {
   const other = await target(c,c.req.param("handle"));
@@ -425,7 +431,9 @@ app.post("/api/blocks/:handle",async c=>{
   return c.json({ok:true});
 });
 app.delete("/api/blocks/:handle",async c=>{
-  await sql(c,"DELETE FROM blocks WHERE blocker=? AND blocked=(SELECT user_id FROM profiles WHERE handle=?)",uid(c),c.req.param("handle").replace(/^@/,"").toLowerCase()).run();
+  const result=await sql(c,"DELETE FROM blocks WHERE blocker=? AND blocked=(SELECT user_id FROM profiles WHERE handle=?)",uid(c),c.req.param("handle").replace(/^@/,"").toLowerCase()).run();
+  // Only the blocker's own clients show the blocked list.
+  if(result.meta.changes) await notify(c,uid(c));
   return c.json({ok:true});
 });
 app.post("/api/reports/:handle",async c=>{

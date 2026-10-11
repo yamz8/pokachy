@@ -873,8 +873,7 @@ func tui(c *Client) error {
 		case r := <-results:
 			// Like the daemon, stop when the device session is no longer valid
 			// instead of showing a screen that can never load.
-			var apiErr *APIError
-			if errors.As(r.syncErr, &apiErr) && (apiErr.Status == http.StatusUnauthorized || apiErr.Status == http.StatusForbidden) {
+			if isAuthFailure(r.syncErr) {
 				_ = save(filepath.Join(c.Dir, "state.json"), State{NeedsLogin: true})
 				return errors.New("this computer is signed out of Pokachy; run 'pokachy init' to connect it again")
 			}

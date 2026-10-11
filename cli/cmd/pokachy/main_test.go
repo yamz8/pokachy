@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -271,6 +272,40 @@ func TestLogoutClearsRevokedLocalSession(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("%s still exists or could not be checked: %v", name, err)
 		}
+	}
+}
+
+func TestDaemonReportsSignedOutSoSystemdDoesNotRestartIt(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("POKACHY_CONFIG_DIR", dir)
+	var signedOut *signedOutError
+	if err := run([]string{"daemon"}); !errors.As(err, &signedOut) {
+		t.Fatalf("daemon without credentials = %v, want signed-out error", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"Sign in to Pokachy"}`))
+	}))
+	defer server.Close()
+	if err := save(filepath.Join(dir, "credentials.json"), Config{Server: server.URL, Token: "revoked"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"daemon"}); !errors.As(err, &signedOut) {
+		t.Fatalf("daemon with revoked session = %v, want signed-out error", err)
+	}
+	var s State
+	data, err := os.ReadFile(filepath.Join(dir, "state.json"))
+	if err != nil || json.Unmarshal(data, &s) != nil || !s.NeedsLogin {
+		t.Fatalf("state after revoked session = %s, %v", data, err)
+	}
+
+	unit, err := os.ReadFile(filepath.Join("..", "..", "..", "packaging", "systemd", "pokachy.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(unit), "\nRestartPreventExitStatus="+strconv.Itoa(exitSignedOut)+"\n") {
+		t.Fatalf("systemd unit does not prevent restarts for exit status %d", exitSignedOut)
 	}
 }
 

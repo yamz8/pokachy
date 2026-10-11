@@ -30,7 +30,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-const version = "0.3.0"
+const version = "0.3.1"
 
 const omarchyPluginURL = "https://github.com/yamz8/pokachy-omarchy.git"
 const bootstrapInstallerURL = "https://github.com/yamz8/pokachy/releases/latest/download/install.sh"
@@ -94,6 +94,22 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string { return e.Message }
+
+// exitSignedOut is the daemon's exit status when restarting cannot help: the
+// device session is missing, revoked, or suspended. The systemd unit lists it in
+// RestartPreventExitStatus, so a signed-out computer stops polling the server
+// until `pokachy init` starts the service again.
+const exitSignedOut = 78
+
+type signedOutError struct{ err error }
+
+func (e *signedOutError) Error() string { return e.err.Error() }
+func (e *signedOutError) Unwrap() error { return e.err }
+
+func isAuthFailure(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && (apiErr.Status == http.StatusUnauthorized || apiErr.Status == http.StatusForbidden)
+}
 func safe(s string) string {
 	return strings.Map(func(r rune) rune {
 		// Escape, bidi, and other format characters can change how a terminal
@@ -450,6 +466,10 @@ service with the repository's scripts/install.sh after building.
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "pokachy:", safe(err.Error()))
+		var signedOut *signedOutError
+		if errors.As(err, &signedOut) {
+			os.Exit(exitSignedOut)
+		}
 		os.Exit(1)
 	}
 }
@@ -487,6 +507,9 @@ func run(args []string) error {
 	}
 	c, err := loadClient()
 	if err != nil {
+		if args[0] == "daemon" {
+			return &signedOutError{err}
+		}
 		return err
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -704,8 +727,15 @@ func run(args []string) error {
 	default:
 		return errors.New("unknown command; run 'pokachy help'")
 	}
+	var friendship struct {
+		Accepted bool `json:"accepted"`
+	}
 	if path != "" {
-		if err = c.request(ctx, method, path, body, nil, ""); err != nil {
+		var output any
+		if args[0] == "friends" && args[1] == "add" {
+			output = &friendship
+		}
+		if err = c.request(ctx, method, path, body, output, ""); err != nil {
 			return err
 		}
 	}
@@ -715,9 +745,14 @@ func run(args []string) error {
 	if asJSON {
 		outputJSON(map[string]bool{"ok": true})
 	} else {
-		if args[0] == "poke" {
+		switch {
+		case args[0] == "poke":
 			fmt.Printf("A little nudge sent to %s.\n", safe(args[1]))
-		} else {
+		case friendship.Accepted:
+			fmt.Printf("You and @%s are friends now.\n", safe(strings.TrimPrefix(args[2], "@")))
+		case args[0] == "friends" && args[1] == "add":
+			fmt.Printf("Friend request sent to @%s.\n", safe(strings.TrimPrefix(args[2], "@")))
+		default:
 			fmt.Println("Done.")
 		}
 	}
@@ -1471,12 +1506,9 @@ func (c *Client) daemon(ctx context.Context) error {
 	}
 	backoff := time.Second
 	for ctx.Err() == nil {
-		if err = syncState(); err != nil {
-			var apiErr *APIError
-			if errors.As(err, &apiErr) && (apiErr.Status == 401 || apiErr.Status == 403) {
-				_ = save(filepath.Join(c.Dir, "state.json"), State{NeedsLogin: true})
-				return err
-			}
+		if err = syncState(); err != nil && isAuthFailure(err) {
+			_ = save(filepath.Join(c.Dir, "state.json"), State{NeedsLogin: true})
+			return &signedOutError{err}
 		}
 		endpoint := strings.Replace(c.Config.Server, "https://", "wss://", 1)
 		endpoint = strings.Replace(endpoint, "http://", "ws://", 1)

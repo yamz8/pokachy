@@ -4,6 +4,7 @@ import worker from "../src/index";
 import migration from "../migrations/0001_initial.sql?raw";
 import profileSettingsMigration from "../migrations/0002_profile_settings.sql?raw";
 import accountHandoffsMigration from "../migrations/0003_account_handoffs.sql?raw";
+import lookupIndexesMigration from "../migrations/0004_lookup_indexes.sql?raw";
 import { version } from "../package.json";
 
 const origin = "http://127.0.0.1:8787";
@@ -31,7 +32,7 @@ async function user(handle: string) {
   expect((await request("/api/profile",data.token,"PUT",{handle})).status).toBe(200);
   return data;
 }
-beforeAll(async()=>{ await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); });
+beforeAll(async()=>{ await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); await env.DB.exec(lookupIndexesMigration); });
 
 test("friendly install route serves the getting-started page",async()=>{
   const response=await request("/install");
@@ -72,9 +73,13 @@ test("email onboarding, consent, idempotency, concurrency, reply, block and isol
   const poke=(token:string,handle:string,key=crypto.randomUUID())=>request(`/api/pokes/${handle}`,token,"POST",{}, {"Idempotency-Key":key});
   expect((await request("/api/state")).status).toBe(401);
   expect((await poke(a.token,"bobby")).status).toBe(409);
-  expect((await request("/api/friends/bobby",a.token,"POST",{})).status).toBe(200);
+  const asked=await request("/api/friends/bobby",a.token,"POST",{});
+  expect(asked.status).toBe(200);
+  expect(await asked.json()).toEqual({ok:true,accepted:false});
+  expect((await request("/api/friends/bobby",a.token,"POST",{})).status).toBe(409);
   expect((await request("/api/friends/bobby/accept",a.token,"POST",{})).status).toBe(404);
   expect((await request("/api/friends/alice/accept",b.token,"POST",{})).status).toBe(200);
+  expect((await request("/api/friends/alice",b.token,"POST",{})).status).toBe(409);
   const key=crypto.randomUUID();
   const results=await Promise.all([poke(a.token,"bobby",key),poke(a.token,"bobby",key)]);
   expect(results.map(r=>r.status).sort()).toEqual([200,201]);
@@ -114,6 +119,21 @@ test("administrators can review reports and suspend another user",async()=>{
   expect((await adminRequest("/api/admin/suspend/adminuser","POST")).status).toBe(404);
   expect((await adminRequest("/api/admin/suspend/reporteduser","POST")).status).toBe(200);
   expect((await request("/api/state",reported.token)).status).toBe(401);
+});
+
+test("a reciprocal friend request accepts the pending one",async()=>{
+  const a=await user("mutualalice"), b=await user("mutualbobby"), x=await user("mutualblocker");
+  expect((await request("/api/friends/mutualbobby",a.token,"POST",{})).status).toBe(200);
+  const mutual=await request("/api/friends/mutualalice",b.token,"POST",{});
+  expect(mutual.status,await mutual.clone().text()).toBe(200);
+  expect(await mutual.json()).toEqual({ok:true,accepted:true});
+  const state=await (await request("/api/state",a.token)).json() as {friends:{handle:string}[];requests:unknown[]};
+  expect({friends:state.friends.map(f=>f.handle),requests:state.requests}).toEqual({friends:["mutualbobby"],requests:[]});
+  expect((await request("/api/pokes/mutualbobby",a.token,"POST",{},{"Idempotency-Key":crypto.randomUUID()})).status).toBe(201);
+
+  expect((await request("/api/friends/mutualblocker",a.token,"POST",{})).status).toBe(200);
+  expect((await request("/api/blocks/mutualalice",x.token,"POST",{})).status).toBe(200);
+  expect((await request("/api/friends/mutualalice",x.token,"POST",{})).status).toBe(403);
 });
 
 test("history is friend-scoped and cursor-paginated",async()=>{
@@ -299,6 +319,15 @@ test("live updates stay private and a revoked session loses its connection",asyn
   expect(events.every(value=>value==='{"type":"sync"}')).toBe(true);
   ws.send("ping");
   await expect.poll(()=>events.includes("pong")).toBe(true);
+  // Unblocking refreshes the blocker's other clients, which list blocked people.
+  await user("liveoutsider");
+  const syncs=()=>events.filter(value=>value==='{"type":"sync"}').length;
+  const beforeBlock=syncs();
+  expect((await request("/api/blocks/liveoutsider",b.token,"POST",{})).status).toBe(200);
+  await expect.poll(syncs).toBe(beforeBlock+1);
+  expect((await request("/api/blocks/liveoutsider",b.token,"DELETE",{})).status).toBe(200);
+  await expect.poll(syncs).toBe(beforeBlock+2);
+  expect((await request("/api/blocks/liveoutsider",b.token,"DELETE",{})).status).toBe(200);
   await request("/api/auth/sign-out",b.token,"POST",{});
   await request("/api/friends/livebobby",a.token,"DELETE",{});
   await expect.poll(()=>closed).toBe(true);

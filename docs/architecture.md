@@ -16,13 +16,13 @@ Turnstile gates email-code requests. The backend requires success, the `login` a
 
 ## Pokes and live delivery
 
-A normalized friendship pair requires recipient acceptance. A conditional SQL insert checks friendship, blocking, suspension, existing outstanding pokes, and the ten-second cooldown. A D1 batch also resolves the reverse pending poke when replying. Unique sender/request keys make retries idempotent.
+A normalized friendship pair requires recipient acceptance; a reciprocal request counts as acceptance. A conditional SQL insert checks friendship, blocking, suspension, existing outstanding pokes, and the ten-second cooldown. A D1 batch also resolves the reverse pending poke when replying. Unique sender/request keys make retries idempotent.
 
 A Durable Object per user holds hibernating WebSockets. It checks session validity before publishing a `sync` signal. The signal contains no inbox data; clients retrieve current state from the authenticated HTTP API. Separate object names implement request budgets. Reconnects and periodic refresh recover missed signals.
 
 ## Desktop
 
-The Go executable provides the CLI and notification daemon. The daemon reconnects with backoff, refreshes state periodically, and invokes `notify-send` with an argument array. Persistent notified IDs prevent duplicates after restarting. Quiet mode preserves the inbox and suppresses notifications; resuming does not replay suppressed notifications.
+The Go executable provides the CLI and notification daemon. The daemon reconnects with backoff, refreshes state periodically, and invokes `notify-send` with an argument array. Persistent notified IDs prevent duplicates after restarting. A missing, revoked, or suspended session exits with status 78, which the systemd unit excludes from automatic restarts; `pokachy init` starts the service again. Quiet mode preserves the inbox and suppresses notifications; resuming does not replay suppressed notifications.
 
 Credentials and cache live in `$XDG_CONFIG_HOME/pokachy`, normally `~/.config/pokachy`, with 0700 directories and 0600 files. `POKACHY_CONFIG_DIR` supports isolated instances. HTTP is allowed only for loopback development; redirects cannot forward bearer tokens. Omarchy reads `pokachy watch --json` and invokes CLI commands, never reading credentials itself.
 
