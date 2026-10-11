@@ -392,6 +392,8 @@ def main() -> None:
         # A hub update forces the daemon to observe the revoked bearer session.
         api(base, "/api/friends/clialice", method="DELETE", token=bobby, body={})
         wait_for(lambda: daemon.poll() is not None, "revoked daemon exit")
+        # The systemd unit's RestartPreventExitStatus relies on this exact status.
+        check(daemon.returncode == 78, "revoked daemon exit status " + str(daemon.returncode))
         state = read_json(cli_dir / "state.json")
         check(isinstance(state, dict) and state.get("needsLogin") is True, "revoked session state")
         run([str(binary), "logout"], "CLI logout", cwd=ROOT, env=cli_env)

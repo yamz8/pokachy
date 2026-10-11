@@ -73,6 +73,8 @@ systemctl --user daemon-reload
 systemctl --user enable --now pokachy.service
 ```
 
+If this computer is signed out, or its device session is revoked, the service stops instead of retrying (exit status 78). Run `pokachy init` to connect again; it restarts the service.
+
 Pokachy sends desktop notifications through `notify-send`. Install a libnotify-compatible notification utility and use a desktop with a notification service if `notify-send` is unavailable.
 
 ## Without systemd

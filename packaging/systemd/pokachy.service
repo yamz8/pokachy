@@ -8,6 +8,8 @@ Type=simple
 ExecStart=%h/.local/bin/pokachy daemon
 Restart=on-failure
 RestartSec=5
+# Signed out, revoked, or suspended: wait for `pokachy init` instead of retrying.
+RestartPreventExitStatus=78
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
 
 [Install]

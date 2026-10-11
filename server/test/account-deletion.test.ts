@@ -5,6 +5,7 @@ import { cleanExpiredAuth } from "../src/retention";
 import migration from "../migrations/0001_initial.sql?raw";
 import profileSettingsMigration from "../migrations/0002_profile_settings.sql?raw";
 import accountHandoffsMigration from "../migrations/0003_account_handoffs.sql?raw";
+import lookupIndexesMigration from "../migrations/0004_lookup_indexes.sql?raw";
 
 const origin = "http://127.0.0.1:8787";
 const ctx = { waitUntil: () => {}, passThroughOnException: () => {} };
@@ -34,7 +35,7 @@ async function deletionCode(token: string, email: string) {
 }
 const count = async (query: string, ...args: unknown[]) => Number((await env.DB.prepare(query).bind(...args).first<{ count: number }>())?.count ?? 0);
 
-beforeAll(async () => { await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); });
+beforeAll(async () => { await env.DB.exec(migration); await env.DB.exec(profileSettingsMigration); await env.DB.exec(accountHandoffsMigration); await env.DB.exec(lookupIndexesMigration); });
 
 test("account deletion requires a recent verified, non-administrator session and confirmation", async () => {
   expect((await request("/api/account/delete", undefined, "POST", { confirmation: "DELETE MY ACCOUNT" })).status).toBe(401);

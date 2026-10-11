@@ -43,7 +43,7 @@ Account settings let you change your handle, display name, profile picture, and 
 ```sh
 pokachy tui          # interactive terminal view
 pokachy friends add @friend
-# Your friend accepts on their computer:
+# Your friend accepts on their computer (adding you back works too):
 pokachy friends accept @yourhandle
 
 pokachy poke @friend
