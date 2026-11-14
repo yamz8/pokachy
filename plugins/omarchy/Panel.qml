@@ -6,6 +6,7 @@ import QtQuick.Dialogs as Dialogs
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 Panel {
@@ -66,7 +67,7 @@ Panel {
   readonly property bool settingsCanSave: settingsOpen && settingsDirty && settingsNameValid && settingsHandleValid && !actionRunning
   readonly property color secondaryForeground: Qt.rgba(foreground.r, foreground.g, foreground.b, 0.65)
   readonly property int inboxCount: pokachyState && pokachyState.inbox ? pokachyState.inbox.length : 0
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   // Quickshell's login environment can omit the CLI install directory. Keep
   // its PATH first so custom installs still win, then fall back to the
@@ -792,9 +793,9 @@ Panel {
                 width: Style.space(10)
                 height: width
                 radius: width / 2
-                color: root.online ? "#75b56b" : Color.muted
+                color: root.online ? "#75b56b" : Commons.Color.muted
                 border.width: Style.space(2)
-                border.color: Color.popups.background
+                border.color: Commons.Color.popups.background
                 Accessible.role: Accessible.StaticText
                 Accessible.name: root.online ? "Connected to Pokachy" : "Offline · cached activity"
                 MouseArea { id: connectionMouse; anchors.fill: parent; hoverEnabled: true }
@@ -882,7 +883,7 @@ Panel {
             width: parent.width
             implicitHeight: errorText.implicitHeight + Style.space(16) + (retryButton.visible ? retryButton.height + Style.space(8) : 0)
             radius: Style.cornerRadius
-            color: Style.hoverFillFor(root.bar ? root.bar.urgent : Color.urgent, root.bar ? root.bar.urgent : Color.urgent)
+            color: Style.hoverFillFor(root.bar ? root.bar.urgent : Commons.Color.urgent, root.bar ? root.bar.urgent : Commons.Color.urgent)
             Text {
               id: errorText
               anchors.top: parent.top
@@ -1001,7 +1002,7 @@ Panel {
                 PanelActionButton {
                   iconText: "󰄬"
                   tooltipText: root.settingsCanSave ? "Save profile changes" : "Fix invalid profile fields before saving"
-                  foreground: Color.accent
+                  foreground: Commons.Color.accent
                   fontFamily: root.fontFamily
                   focusable: true
                   Accessible.name: "Save profile changes"
@@ -1035,15 +1036,15 @@ Panel {
                   width: Style.space(16)
                   height: width
                   radius: width / 2
-                  color: Color.popups.background
+                  color: Commons.Color.popups.background
                   border.width: Math.max(1, Style.space(1))
-                  border.color: Color.accent
+                  border.color: Commons.Color.accent
                   z: 12
                   Accessible.ignored: true
                   Text {
                     anchors.centerIn: parent
                     text: "󰏫"
-                    color: Color.accent
+                    color: Commons.Color.accent
                     font.family: root.fontFamily
                     font.pixelSize: Style.space(10)
                   }
@@ -1059,8 +1060,8 @@ Panel {
                   closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
 
                   background: BorderSurface {
-                    color: Color.popups.background
-                    borderSpec: Border.localOrSurfaceSpec("popups", "border", Color.popups.border, Color.popups.border, Math.max(1, Style.normalBorderWidth))
+                    color: Commons.Color.popups.background
+                    borderSpec: Border.localOrSurfaceSpec("popups", "border", Commons.Color.popups.border, Commons.Color.popups.border, Math.max(1, Style.normalBorderWidth))
                     radius: Style.cornerRadius
                   }
 
@@ -1152,7 +1153,7 @@ Panel {
                     text: settingsHandle.text.trim() === "" ? "A handle is required." : "Start with a–z or 0–9; then use a–z, 0–9, or _."
                     textFormat: Text.PlainText
                     verticalAlignment: Text.AlignVCenter
-                    color: Color.urgent
+                    color: Commons.Color.urgent
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
                   }
@@ -1233,7 +1234,7 @@ Panel {
                     }
                     Text {
                       text: root.pokachyState.me && root.pokachyState.me.githubLinked === true ? "󰄬  Connected" : (root.pokachyState.me && root.pokachyState.me.githubAvailable === true ? "Not connected" : "Unavailable")
-                      color: root.pokachyState.me && root.pokachyState.me.githubLinked === true ? Color.accent : root.secondaryForeground
+                      color: root.pokachyState.me && root.pokachyState.me.githubLinked === true ? Commons.Color.accent : root.secondaryForeground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
                     }
@@ -1303,7 +1304,7 @@ Panel {
               text: root.actionNotice
               textFormat: Text.PlainText
               wrapMode: Text.Wrap
-              color: Color.accent
+              color: Commons.Color.accent
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
@@ -1321,8 +1322,8 @@ Panel {
               placeholderText: "Search"
               background: BorderSurface {
                 radius: 0
-                color: Style.controlFill(friendSearch.activeFocus, friendSearch.hovered, root.foreground, Color.accent)
-                borderSpec: Border.controlSpec(friendSearch.activeFocus ? "focus" : (friendSearch.hovered ? "hover-cursor" : "normal"), root.foreground, Color.accent)
+                color: Style.controlFill(friendSearch.activeFocus, friendSearch.hovered, root.foreground, Commons.Color.accent)
+                borderSpec: Border.controlSpec(friendSearch.activeFocus ? "focus" : (friendSearch.hovered ? "hover-cursor" : "normal"), root.foreground, Commons.Color.accent)
               }
               activeFocusOnTab: true
               Accessible.name: "Find a contact or add a handle"
@@ -1451,7 +1452,7 @@ Panel {
                   text: root.activeIncomingPoke ? "poked you" : (root.activeWaitingForReply ? "waiting for poke back" : "@" + root.handle(root.activeFriend))
                   textFormat: Text.PlainText
                   elide: Text.ElideRight
-                  color: root.activeIncomingPoke ? (root.bar ? root.bar.urgent : Color.urgent) : Qt.darker(root.foreground, 1.45)
+                  color: root.activeIncomingPoke ? (root.bar ? root.bar.urgent : Commons.Color.urgent) : Qt.darker(root.foreground, 1.45)
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
                 }
@@ -1478,8 +1479,8 @@ Panel {
                   closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
 
                   background: BorderSurface {
-                    color: Color.popups.background
-                    borderSpec: Border.localOrSurfaceSpec("popups", "border", Color.popups.border, Color.popups.border, Math.max(1, Style.normalBorderWidth))
+                    color: Commons.Color.popups.background
+                    borderSpec: Border.localOrSurfaceSpec("popups", "border", Commons.Color.popups.border, Commons.Color.popups.border, Math.max(1, Style.normalBorderWidth))
                     radius: Style.cornerRadius
                   }
 
@@ -1518,7 +1519,7 @@ Panel {
                       iconText: "󰅖"
                       leftAlign: true
                       focusable: true
-                      foreground: root.bar ? root.bar.urgent : Color.urgent
+                      foreground: root.bar ? root.bar.urgent : Commons.Color.urgent
                       fontFamily: root.fontFamily
                       onClicked: {
                         conversationMenu.close()
@@ -1674,7 +1675,7 @@ Panel {
               id: conversationPoke
               focusFallback: conversationBack
               fontFamily: root.fontFamily
-              foreground: root.activeIncomingPoke ? Color.accent : root.foreground
+              foreground: root.activeIncomingPoke ? Commons.Color.accent : root.foreground
               width: parent.width
               height: Style.space(38)
               sending: root.activeSendingPoke
@@ -1782,7 +1783,7 @@ Panel {
         PokeButton {
           size: Style.space(36)
           fontFamily: root.fontFamily
-          foreground: friendItem.hasIncoming ? Color.accent : root.foreground
+          foreground: friendItem.hasIncoming ? Commons.Color.accent : root.foreground
           sending: friendItem.sendingPoke
           incoming: friendItem.hasIncoming
           waiting: friendItem.waitingForReply

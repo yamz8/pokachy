@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 Item {
@@ -15,7 +16,7 @@ Item {
   readonly property bool waitingOnly: waiting && !incoming
   property real size: Style.space(36)
   property string fontFamily: Style.font.family
-  property color foreground: incoming ? Color.accent : Color.foreground
+  property color foreground: incoming ? Commons.Color.accent : Commons.Color.foreground
   signal clicked()
   implicitWidth: size
   implicitHeight: size
@@ -57,7 +58,7 @@ Item {
     width: Style.space(20)
     height: width
     visible: !root.sending
-    foreground: !root.actionable ? Color.muted : (root.handHovered ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.8) : root.foreground)
+    foreground: !root.actionable ? Commons.Color.muted : (root.handHovered ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.8) : root.foreground)
   }
   Item {
     id: sendingSpinner
@@ -86,9 +87,9 @@ Item {
     RotationAnimator on rotation {
       from: 0
       to: 360
-      duration: 900
+      duration: Style.duration(900)
       loops: Animation.Infinite
-      running: root.sending
+      running: root.sending && !Style.reduceMotion
     }
   }
   Rectangle {
@@ -99,14 +100,14 @@ Item {
     width: root.incoming ? Style.space(8) : Style.space(12)
     height: width
     radius: width / 2
-    color: root.incoming ? Color.accent : Color.popups.background
+    color: root.incoming ? Commons.Color.accent : Commons.Color.popups.background
     border.width: Style.space(1)
-    border.color: Color.popups.background
+    border.color: Commons.Color.popups.background
     Text {
       visible: root.waitingOnly
       anchors.centerIn: parent
       text: "󰥔"
-      color: Color.muted
+      color: Commons.Color.muted
       font.family: root.fontFamily
       font.pixelSize: Style.space(11)
     }
