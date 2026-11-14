@@ -11,3 +11,7 @@ pokachy omarchy install
 Pokachy delegates new installations to `omarchy plugin add`, so Omarchy still validates the plugin, asks for confirmation, and prompts for its bar placement. Manage it later with `omarchy plugin update com.pokachy.poke` or `omarchy plugin remove com.pokachy.poke`. The widget hot-reloads after plugin updates or shell layout changes.
 
 The panel launches `pokachy init` in Omarchy's floating terminal when the computer is not connected. It shows cached data as offline when the companion has not synced recently. Middle-click the bar icon refreshes the local status. Its CLI processes preserve Omarchy's existing `PATH` order and also check `~/.local/bin`, the packaged install location, so the panel can find a normal per-user install even when the desktop session did not inherit that directory.
+
+## Omarchy shell compatibility
+
+Omarchy 4.0.5 moved the shell to Qt 6.12, whose `QtQuick` import adds its own `Color` type. Omarchy asks every plugin to import `qs.Commons as Commons` and write `Commons.Color.<role>` for the theme palette, because a bare `Color.accent` can resolve to Qt's type instead of the theme. Keep `Style`, `Border`, and `Util` unqualified. Animation lengths go through `Style.duration(ms)` and looping animations also check `!Style.reduceMotion`, so the panel stops moving when `omarchy toggle animations` turns animations off.
